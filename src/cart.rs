@@ -15,6 +15,16 @@ pub struct CartHeader {
     global_checksum: u16
 }
 
+fn ascii_str_from_bytes(bytes: &[u8]) -> String {
+    let mut s = String::new();
+    for &b in bytes {
+        if b.is_ascii_uppercase() || b.is_ascii_digit() {
+            s.push(b as char);
+        }
+    }
+    s
+}
+
 impl CartHeader {
     pub fn read_rom(rom: &[u8]) -> CartHeader {
         let mut entry = [0u8; 4];
@@ -45,7 +55,7 @@ impl CartHeader {
     pub fn print_header(&self) {
         println!("Cart Header     :");
         println!("entry           : {:X?}", self.entry);
-        println!("title           : {:X?}", self.title);
+        println!("title           : {:X?}", ascii_str_from_bytes(&self.title));
         println!("cgb flag        : {:X?}", self.cgb_flag);
         println!("new lic code    : {:X?}", self.new_lic_code);
         println!("sgb flag        : {:X?}", self.sgb_flag);

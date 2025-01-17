@@ -1,4 +1,10 @@
-pub struct CartHeader {
+use std::fmt::format;
+
+pub struct Cart {
+    header: CartHeader
+}
+
+struct CartHeader {
     entry: [u8; 4],
     nin_logo: [u8; 0x30],
     title: [u8; 0x10],
@@ -6,7 +12,7 @@ pub struct CartHeader {
     new_lic_code: u16,
     sgb_flag: u8,
     cart_type: u8,
-    rom_size: u8,
+    rom_size: usize,
     ram_size: u8,
     destination_code: u8,
     old_lic_code: u8,
@@ -25,8 +31,38 @@ fn ascii_str_from_bytes(bytes: &[u8]) -> String {
     s
 }
 
+fn rom_size_from_byte(byte: u8) -> Option<usize> {
+    match byte {
+        0x00 => Some(32 * 1024), // 32 KiB
+        0x01 => Some(64 * 1024), // 64 KiB
+        0x02 => Some(128 * 1024), // 128 KiB
+        0x03 => Some(256 * 1024),
+        0x04 => Some(512 * 1024),
+        0x05 => Some(1024 * 1024), // 1 MiB
+        0x06 => Some(2 * 1024 * 1024),
+        0x07 => Some(4 * 1024 * 1024),
+        0x08 => Some(8 * 1024 * 1024),
+        0x52 => Some((1.1 * 1048576 as f32) as usize),
+        0x53 => Some((1.2 * 1048576 as f32) as usize),
+        0x54 => Some((1.5 * 1048576 as f32) as usize),
+        _ => None
+    }
+}
+
+impl Cart {
+    pub fn read_rom(rom: &[u8]) -> Cart {
+        Cart {
+            header: CartHeader::read_rom(rom)
+        }
+    }
+
+    pub fn print_header(&self) {
+        self.header.print_header();
+    }
+}
+
 impl CartHeader {
-    pub fn read_rom(rom: &[u8]) -> CartHeader {
+    fn read_rom(rom: &[u8]) -> CartHeader {
         let mut entry = [0u8; 4];
         entry.copy_from_slice(&rom[0x100..0x104]);
         let mut nin_logo = [0u8; 48];
@@ -42,7 +78,7 @@ impl CartHeader {
             new_lic_code: ((rom[0x144] as u16) << 8) | rom[0x145] as u16,
             sgb_flag: rom[0x146],
             cart_type: rom[0x147],
-            rom_size: rom[0x148],
+            rom_size: rom_size_from_byte(rom[0x148]).expect(&format!("No rom size mapped for {:X?}", rom[0x148])),
             ram_size: rom[0x149],
             destination_code: rom[0x14A],
             old_lic_code: rom[0x14B],
@@ -52,7 +88,7 @@ impl CartHeader {
         }
     }
 
-    pub fn print_header(&self) {
+    fn print_header(&self) {
         println!("Cart Header     :");
         println!("entry           : {:X?}", self.entry);
         println!("title           : {:X?}", ascii_str_from_bytes(&self.title));

@@ -15,7 +15,7 @@ fn main() {
     let mut file = File::open(&format!("roms/{fpath}")).expect("Error opening file.");
     let mut file_buffer = Vec::new();
     file.read_to_end(&mut file_buffer).expect("Error reading file.");
-    let ch = cart::CartHeader::read_rom(&file_buffer);
+    let ch = cart::Cart::read_rom(&file_buffer);
     
     ch.print_header();
 }

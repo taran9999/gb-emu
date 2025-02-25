@@ -1,7 +1,5 @@
-use std::fmt::format;
-
 pub struct Cart {
-    header: CartHeader
+    header: CartHeader,
 }
 
 struct CartHeader {
@@ -13,12 +11,12 @@ struct CartHeader {
     sgb_flag: u8,
     cart_type: u8,
     rom_size: usize,
-    ram_size: u8,
+    ram_size: usize,
     destination_code: u8,
     old_lic_code: u8,
     rom_version: u8,
     header_checksum: u8,
-    global_checksum: u16
+    global_checksum: u16,
 }
 
 fn ascii_str_from_bytes(bytes: &[u8]) -> String {
@@ -33,8 +31,8 @@ fn ascii_str_from_bytes(bytes: &[u8]) -> String {
 
 fn rom_size_from_byte(byte: u8) -> Option<usize> {
     match byte {
-        0x00 => Some(32 * 1024), // 32 KiB
-        0x01 => Some(64 * 1024), // 64 KiB
+        0x00 => Some(32 * 1024),  // 32 KiB
+        0x01 => Some(64 * 1024),  // 64 KiB
         0x02 => Some(128 * 1024), // 128 KiB
         0x03 => Some(256 * 1024),
         0x04 => Some(512 * 1024),
@@ -45,14 +43,26 @@ fn rom_size_from_byte(byte: u8) -> Option<usize> {
         0x52 => Some((1.1 * 1048576 as f32) as usize),
         0x53 => Some((1.2 * 1048576 as f32) as usize),
         0x54 => Some((1.5 * 1048576 as f32) as usize),
-        _ => None
+        _ => None,
+    }
+}
+
+fn ram_size_from_byte(byte: u8) -> Option<usize> {
+    match byte {
+        0x00 => Some(0),
+        0x01 => Some(2 * 1024), // 2 KiB according to the pandocs footnote, however this flag is actually unused
+        0x02 => Some(8 * 1024),
+        0x03 => Some(32 * 1024),
+        0x04 => Some(128 * 1024),
+        0x05 => Some(64 * 1024),
+        _ => None,
     }
 }
 
 impl Cart {
     pub fn read_rom(rom: &[u8]) -> Cart {
         Cart {
-            header: CartHeader::read_rom(rom)
+            header: CartHeader::read_rom(rom),
         }
     }
 
@@ -78,13 +88,15 @@ impl CartHeader {
             new_lic_code: ((rom[0x144] as u16) << 8) | rom[0x145] as u16,
             sgb_flag: rom[0x146],
             cart_type: rom[0x147],
-            rom_size: rom_size_from_byte(rom[0x148]).expect(&format!("No rom size mapped for {:X?}", rom[0x148])),
-            ram_size: rom[0x149],
+            rom_size: rom_size_from_byte(rom[0x148])
+                .expect(&format!("No rom size mapped for {:X?}", rom[0x148])),
+            ram_size: ram_size_from_byte(rom[0x149])
+                .expect(&format!("No ram size mapped for {:X?}", rom[0x149])),
             destination_code: rom[0x14A],
             old_lic_code: rom[0x14B],
             rom_version: rom[0x14C],
             header_checksum: rom[0x14D],
-            global_checksum: ((rom[0x14E] as u16) << 8) | rom[0x14F] as u16
+            global_checksum: ((rom[0x14E] as u16) << 8) | rom[0x14F] as u16,
         }
     }
 
@@ -105,3 +117,4 @@ impl CartHeader {
         println!("global checksum : {:X?}", self.global_checksum);
     }
 }
+

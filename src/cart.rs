@@ -1,3 +1,5 @@
+use core::fmt;
+
 pub struct Cart {
     header: CartHeader,
 }
@@ -49,7 +51,7 @@ enum CartBaseType {
     HuC1,
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 struct CartType {
     base_type: CartBaseType,
     ram: bool,
@@ -197,6 +199,28 @@ impl CartType {
             }),
             _ => None,
         }
+    }
+}
+
+impl fmt::Debug for CartType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.base_type)?;
+        if self.ram {
+            write!(f, "+RAM")?;
+        }
+        if self.battery {
+            write!(f, "+BATTERY")?;
+        }
+        if self.timer {
+            write!(f, "+TIMER")?;
+        }
+        if self.rumble {
+            write!(f, "+RUMBLE")?;
+        }
+        if self.sensor {
+            write!(f, "+SENSOR")?;
+        }
+        Ok(())
     }
 }
 

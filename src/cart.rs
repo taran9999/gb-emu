@@ -2,6 +2,7 @@ use core::fmt;
 
 pub struct Cart {
     header: CartHeader,
+    data: Vec<u8>,
 }
 
 struct CartHeader {
@@ -299,11 +300,20 @@ impl Cart {
     pub fn read_rom(rom: &[u8]) -> Cart {
         Cart {
             header: CartHeader::read_rom(rom),
+            data: rom.to_vec(),
         }
     }
 
     pub fn print_header(&self) {
         self.header.print_header();
+    }
+
+    pub fn cart_read(&self, address: usize) -> u8 {
+        self.data[address]
+    }
+
+    pub fn cart_write(&mut self, address: usize, value: u8) {
+        self.data[address] = value;
     }
 }
 
@@ -317,9 +327,9 @@ impl CartHeader {
         title.copy_from_slice(&rom[0x134..0x144]);
 
         CartHeader {
-            entry: entry,
-            nin_logo: nin_logo,
-            title: title,
+            entry,
+            nin_logo,
+            title,
             cgb_flag: cgb_flag_from_byte(rom[0x143])
                 .expect(&format!("No cgb flag mapped for {:X?}", rom[0x143])),
             new_lic_code: ((rom[0x144] as u16) << 8) | rom[0x145] as u16,

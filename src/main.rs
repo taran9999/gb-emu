@@ -1,8 +1,10 @@
+use std::env;
 use std::fs::File;
 use std::io::Read;
-use std::env;
 
+mod bus;
 mod cart;
+mod cpu;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -14,8 +16,9 @@ fn main() {
 
     let mut file = File::open(&format!("roms/{fpath}")).expect("Error opening file.");
     let mut file_buffer = Vec::new();
-    file.read_to_end(&mut file_buffer).expect("Error reading file.");
+    file.read_to_end(&mut file_buffer)
+        .expect("Error reading file.");
     let ch = cart::Cart::read_rom(&file_buffer);
-    
+
     ch.print_header();
 }

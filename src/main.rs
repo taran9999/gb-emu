@@ -2,6 +2,10 @@ use std::env;
 use std::fs::File;
 use std::io::Read;
 
+use bus::Bus;
+use cart::Cart;
+use cpu::CPU;
+
 mod bus;
 mod cart;
 mod cpu;
@@ -18,7 +22,15 @@ fn main() {
     let mut file_buffer = Vec::new();
     file.read_to_end(&mut file_buffer)
         .expect("Error reading file.");
-    let ch = cart::Cart::read_rom(&file_buffer);
+    let ch = Cart::read_rom(&file_buffer);
 
     ch.print_header();
+
+    let mut bus = Bus::new(ch);
+    let mut cpu = CPU::init(&mut bus);
+
+    for i in 0..5 {
+        let byte = cpu.fetch();
+        println!("Byte: {:X}", byte);
+    }
 }

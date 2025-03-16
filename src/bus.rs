@@ -15,24 +15,29 @@ FF80 - FFFE: High RAM
 FFFF: Interrupt Enable register
 */
 
-struct Bus {
+pub struct Bus {
     cart: Cart,
 }
 
 impl Bus {
-    fn new(cart: Cart) -> Bus {
+    pub fn new(cart: Cart) -> Bus {
         Bus { cart }
     }
 
-    fn read(&self, address: usize) {
-        if address <= 0x8000 {
-            self.cart.cart_read(address);
+    pub fn read(&self, address: usize) -> u8 {
+        match address {
+            0x0000..=0x7FFF => self.cart.cart_read(address),
+            _ => {
+                println!("(Warning): read from unknown area {:X}", address);
+                0xFF
+            }
         }
     }
 
-    fn write(&mut self, address: usize, value: u8) {
-        if address <= 0x8000 {
-            self.cart.cart_write(address, value);
+    pub fn write(&mut self, address: usize, value: u8) {
+        match address {
+            0x0000..=0x7FFF => self.cart.cart_write(address, value),
+            _ => println!("(Warning): write to unknown area {:X}", address),
         }
     }
 }

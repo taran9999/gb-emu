@@ -30,11 +30,11 @@ impl Registers {
 
 pub struct CPU<'a> {
     registers: Registers,
-    bus: &'a mut Bus,
+    bus: &'a mut Bus<'a>,
 }
 
 impl CPU<'_> {
-    pub fn init(bus: &mut Bus) -> CPU {
+    pub fn init<'a>(bus: &'a mut Bus<'a>) -> CPU<'a> {
         CPU {
             registers: Registers::init(),
             bus,

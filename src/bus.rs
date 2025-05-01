@@ -15,12 +15,12 @@ FF80 - FFFE: High RAM
 FFFF: Interrupt Enable register
 */
 
-pub struct Bus {
-    cart: Cart,
+pub struct Bus<'a> {
+    cart: &'a mut Cart,
 }
 
-impl Bus {
-    pub fn new(cart: Cart) -> Bus {
+impl Bus<'_> {
+    pub fn new(cart: &mut Cart) -> Bus {
         Bus { cart }
     }
 

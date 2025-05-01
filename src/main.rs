@@ -22,11 +22,11 @@ fn main() {
     let mut file_buffer = Vec::new();
     file.read_to_end(&mut file_buffer)
         .expect("Error reading file.");
-    let ch = Cart::read_rom(&file_buffer);
+    let mut ch = Cart::read_rom(&file_buffer);
 
     ch.print_header();
 
-    let mut bus = Bus::new(ch);
+    let mut bus = Bus::new(&mut ch);
     let mut cpu = CPU::init(&mut bus);
 
     for i in 0..5 {

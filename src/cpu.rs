@@ -50,4 +50,19 @@ impl CPU<'_> {
         self.registers.pc += 1;
         byte
     }
+
+    // Instructions take a variable amount of CPU cycles
+    // from https://emudev.de/gameboy-emulator/opcode-cycles-and-timings/ return the number of
+    // cycles executed to develop accurate timing
+    pub fn execute(&mut self) -> u8 {
+        let opcode = self.fetch();
+        match opcode {
+            // 0x00: NOP
+            0x00 => 4,
+            _ => {
+                println!("Warning: opcode {:X} not implemented", opcode);
+                4
+            }
+        }
+    }
 }

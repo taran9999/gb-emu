@@ -30,7 +30,6 @@ fn main() {
     let mut cpu = CPU::init(&mut bus);
 
     for i in 0..5 {
-        let byte = cpu.fetch();
-        println!("Byte: {:X}", byte);
+        cpu.execute();
     }
 }

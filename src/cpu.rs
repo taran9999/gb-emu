@@ -26,6 +26,15 @@ impl Registers {
             pc: 0x100,
         }
     }
+
+    fn get_bc(&self) -> u16 {
+        (self.b << 8) as u16 | self.c as u16
+    }
+
+    fn set_bc(&mut self, val: u16) {
+        self.c = val as u8;
+        self.b = (val >> 8) as u8;
+    }
 }
 
 pub struct CPU<'a> {
@@ -45,6 +54,10 @@ impl CPU<'_> {
         self.bus.read(address)
     }
 
+    fn bus_write(&mut self, address: usize, value: u8) {
+        self.bus.write(address, value);
+    }
+
     pub fn fetch(&mut self) -> u8 {
         let byte = self.bus_read(self.registers.pc as usize);
         self.registers.pc += 1;
@@ -59,6 +72,28 @@ impl CPU<'_> {
         match opcode {
             // 0x00: NOP
             0x00 => 4,
+
+            // 0x01: LD BC n16
+            0x01 => {
+                self.registers.c = self.fetch();
+                self.registers.b = self.fetch();
+                3
+            }
+
+            // 0x02: LD [BC] A
+            0x02 => {
+                let address = self.registers.get_bc() as usize;
+                let value = self.registers.a;
+                self.bus_write(address, value);
+                2
+            }
+
+            // 0x03: INC BC
+            0x03 => {
+                self.registers.set_bc(self.registers.get_bc() + 1);
+                2
+            }
+
             _ => {
                 println!("Warning: opcode {:X} not implemented", opcode);
                 4

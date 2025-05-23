@@ -35,6 +35,30 @@ impl Registers {
         self.c = val as u8;
         self.b = (val >> 8) as u8;
     }
+
+    fn set_flag_z(&mut self, on: bool) {
+        if on {
+            self.f |= 0b0000_0001
+        } else {
+            self.f &= 0b1111_1110
+        }
+    }
+
+    fn set_flag_n(&mut self, on: bool) {
+        if on {
+            self.f |= 0b0000_0010
+        } else {
+            self.f &= 0b1111_1101
+        }
+    }
+
+    fn set_flag_h(&mut self, on: bool) {
+        if on {
+            self.f |= 0b0000_0100
+        } else {
+            self.f &= 0b1111_1011
+        }
+    }
 }
 
 pub struct CPU<'a> {
@@ -92,6 +116,20 @@ impl CPU<'_> {
             0x03 => {
                 self.registers.set_bc(self.registers.get_bc() + 1);
                 2
+            }
+
+            // 0x04: INC B
+            0x04 => {
+                let ov;
+                (self.registers.b, ov) = self.registers.b.overflowing_add(1);
+                if self.registers.b == 0 {
+                    self.registers.set_flag_z(true);
+                }
+                self.registers.set_flag_n(false);
+                if ov {
+                    self.registers.set_flag_h(true);
+                }
+                1
             }
 
             _ => {

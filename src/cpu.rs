@@ -120,15 +120,18 @@ impl CPU<'_> {
 
             // 0x04: INC B
             0x04 => {
-                let ov;
-                (self.registers.b, ov) = self.registers.b.overflowing_add(1);
+                // check overflow from bit 3 (bits 0-3 are on)
+                if self.registers.b & 0x0F == 0x0F {
+                    self.registers.set_flag_h(true);
+                }
+
+                self.registers.b = self.registers.b.wrapping_add(1);
+                self.registers.set_flag_n(false);
+
                 if self.registers.b == 0 {
                     self.registers.set_flag_z(true);
                 }
-                self.registers.set_flag_n(false);
-                if ov {
-                    self.registers.set_flag_h(true);
-                }
+
                 1
             }
 

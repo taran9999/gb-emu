@@ -135,6 +135,23 @@ impl CPU<'_> {
                 1
             }
 
+            // 0x05: DEC B
+            0x05 => {
+                // check if a borrow from bit 4 is required (bits 0-3 are off)
+                if self.registers.b & 0x0F == 0 {
+                    self.registers.set_flag_h(true);
+                }
+
+                self.registers.b = self.registers.b.wrapping_sub(1);
+                self.registers.set_flag_n(true);
+
+                if self.registers.b == 0 {
+                    self.registers.set_flag_z(true);
+                }
+
+                1
+            }
+
             _ => {
                 println!("Warning: opcode {:X} not implemented", opcode);
                 4

@@ -28,7 +28,7 @@ impl Registers {
     }
 
     fn get_bc(&self) -> u16 {
-        (self.b << 8) as u16 | self.c as u16
+        (self.b as u16) << 8 | self.c as u16
     }
 
     fn set_bc(&mut self, val: u16) {

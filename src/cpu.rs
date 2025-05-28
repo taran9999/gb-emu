@@ -59,6 +59,38 @@ impl Registers {
             self.f &= 0b1111_1011
         }
     }
+
+    fn inc_u8(&mut self, reg: u8) -> u8 {
+        // check overflow from bit 3 (bits 0-3 are on)
+        if reg & 0x0F == 0x0F {
+            self.set_flag_h(true);
+        }
+
+        let r = reg.wrapping_add(1);
+        self.set_flag_n(false);
+
+        if r == 0 {
+            self.set_flag_z(true);
+        }
+
+        r
+    }
+
+    fn dec_u8(&mut self, reg: u8) -> u8 {
+        // check if a borrow from bit 4 is required (bits 0-3 are off)
+        if reg & 0x0F == 0 {
+            self.set_flag_h(true);
+        }
+
+        let r = reg.wrapping_sub(1);
+        self.set_flag_n(true);
+
+        if r == 0 {
+            self.set_flag_z(true);
+        }
+
+        r
+    }
 }
 
 pub struct CPU<'a> {
@@ -120,35 +152,13 @@ impl CPU<'_> {
 
             // 0x04: INC B
             0x04 => {
-                // check overflow from bit 3 (bits 0-3 are on)
-                if self.registers.b & 0x0F == 0x0F {
-                    self.registers.set_flag_h(true);
-                }
-
-                self.registers.b = self.registers.b.wrapping_add(1);
-                self.registers.set_flag_n(false);
-
-                if self.registers.b == 0 {
-                    self.registers.set_flag_z(true);
-                }
-
+                self.registers.b = self.registers.inc_u8(self.registers.b);
                 1
             }
 
             // 0x05: DEC B
             0x05 => {
-                // check if a borrow from bit 4 is required (bits 0-3 are off)
-                if self.registers.b & 0x0F == 0 {
-                    self.registers.set_flag_h(true);
-                }
-
-                self.registers.b = self.registers.b.wrapping_sub(1);
-                self.registers.set_flag_n(true);
-
-                if self.registers.b == 0 {
-                    self.registers.set_flag_z(true);
-                }
-
+                self.registers.b = self.registers.dec_u8(self.registers.b);
                 1
             }
 

@@ -60,6 +60,14 @@ impl Registers {
         }
     }
 
+    fn set_flag_c(&mut self, on: bool) {
+        if on {
+            self.f |= 0b0000_1000
+        } else {
+            self.f &= 0b1111_0111
+        }
+    }
+
     fn inc_u8(&mut self, reg: u8) -> u8 {
         // check overflow from bit 3 (bits 0-3 are on)
         if reg & 0x0F == 0x0F {
@@ -161,6 +169,25 @@ impl CPU<'_> {
                 self.registers.b = self.registers.dec_u8(self.registers.b);
                 1
             }
+
+            // 0x06: LD B n8
+            0x06 => {
+                self.registers.b = self.fetch();
+                2
+            }
+
+            // 0x07: RLCA
+            0x07 => {
+                self.registers.a = self.registers.a.rotate_left(1);
+
+                // set flag c to the leftmost bit that was rotated to the least significant
+                // position
+                self.registers.set_flag_c(self.registers.a & 1 == 1);
+                1
+            }
+
+            // 0x08: LD [a16] SP
+            0x08 => 3,
 
             _ => {
                 println!("Warning: opcode {:X} not implemented", opcode);

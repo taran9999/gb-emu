@@ -130,7 +130,7 @@ impl CPU<'_> {
 
     // Instructions take a variable amount of CPU cycles
     // from https://emudev.de/gameboy-emulator/opcode-cycles-and-timings/ return the number of
-    // cycles executed to develop accurate timing
+    // cycles executed to develop accurate timing. Yields number of T-states.
     pub fn execute(&mut self) -> u8 {
         let opcode = self.fetch();
         match opcode {
@@ -141,7 +141,7 @@ impl CPU<'_> {
             0x01 => {
                 self.registers.c = self.fetch();
                 self.registers.b = self.fetch();
-                3
+                12
             }
 
             // 0x02: LD [BC] A
@@ -149,31 +149,31 @@ impl CPU<'_> {
                 let address = self.registers.get_bc() as usize;
                 let value = self.registers.a;
                 self.bus_write(address, value);
-                2
+                8
             }
 
             // 0x03: INC BC
             0x03 => {
                 self.registers.set_bc(self.registers.get_bc() + 1);
-                2
+                8
             }
 
             // 0x04: INC B
             0x04 => {
                 self.registers.b = self.registers.inc_u8(self.registers.b);
-                1
+                4
             }
 
             // 0x05: DEC B
             0x05 => {
                 self.registers.b = self.registers.dec_u8(self.registers.b);
-                1
+                4
             }
 
             // 0x06: LD B n8
             0x06 => {
                 self.registers.b = self.fetch();
-                2
+                8
             }
 
             // 0x07: RLCA
@@ -183,11 +183,11 @@ impl CPU<'_> {
                 // set flag c to the leftmost bit that was rotated to the least significant
                 // position
                 self.registers.set_flag_c(self.registers.a & 1 == 1);
-                1
+                4
             }
 
             // 0x08: LD [a16] SP
-            0x08 => 3,
+            0x08 => 20,
 
             _ => {
                 println!("Warning: opcode {:X} not implemented", opcode);

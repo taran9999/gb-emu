@@ -36,6 +36,15 @@ impl Registers {
         self.b = (val >> 8) as u8;
     }
 
+    fn get_hl(&self) -> u16 {
+        (self.h as u16) << 8 | self.l as u16
+    }
+
+    fn set_hl(&mut self, val: u16) {
+        self.l = val as u8;
+        self.h = (val >> 8) as u8;
+    }
+
     fn set_flag_z(&mut self, on: bool) {
         if on {
             self.f |= 0b0000_0001
@@ -122,10 +131,17 @@ impl CPU<'_> {
         self.bus.write(address, value);
     }
 
-    pub fn fetch(&mut self) -> u8 {
+    fn fetch(&mut self) -> u8 {
         let byte = self.bus_read(self.registers.pc as usize);
         self.registers.pc += 1;
         byte
+    }
+
+    // fetch two bytes and return a u16 (little endian)
+    fn fetch_2(&mut self) -> u16 {
+        let low = self.fetch() as u16;
+        let high = self.fetch() as u16;
+        (high << 8) | low
     }
 
     // Instructions take a variable amount of CPU cycles
@@ -178,6 +194,10 @@ impl CPU<'_> {
 
             // 0x07: RLCA
             0x07 => {
+                self.registers.set_flag_z(false);
+                self.registers.set_flag_n(false);
+                self.registers.set_flag_h(false);
+
                 self.registers.a = self.registers.a.rotate_left(1);
 
                 // set flag c to the leftmost bit that was rotated to the least significant
@@ -187,7 +207,80 @@ impl CPU<'_> {
             }
 
             // 0x08: LD [a16] SP
-            0x08 => 20,
+            0x08 => {
+                let addr = self.fetch_2();
+
+                // write SP & 0xFF (low byte) to addr, and SP >> 8 (high byte) to addr + 1
+                self.bus_write(addr as usize, (self.registers.sp & 0xFF) as u8);
+                self.bus_write((addr + 1) as usize, (self.registers.sp >> 8) as u8);
+                20
+            }
+
+            // 0x09: ADD HL BC
+            0x09 => {
+                self.registers.set_flag_n(false);
+
+                let hl = self.registers.get_hl();
+                let bc = self.registers.get_bc();
+
+                // set flag c on actual overflow
+                let (res, c) = hl.overflowing_add(bc);
+                if c {
+                    self.registers.set_flag_c(true);
+                }
+
+                // set flag h if the sum of the bottom 12 bits activate the 13th bit
+                if (hl & 0x0FFF) + (bc & 0x0FFF) > 0x0FFF {
+                    self.registers.set_flag_h(true);
+                }
+
+                self.registers.set_hl(res);
+                8
+            }
+
+            // 0x0A: LD A [BC]
+            0x0A => {
+                // get value pointed to by BC and store in A
+                let addr = self.registers.get_bc();
+                self.registers.a = self.bus_read(addr as usize);
+                8
+            }
+
+            // 0x0B: DEC BC
+            0x0B => {
+                self.registers.set_bc(self.registers.get_bc() - 1);
+                8
+            }
+
+            // 0x0C: INC C
+            0x0C => {
+                self.registers.c = self.registers.inc_u8(self.registers.c);
+                4
+            }
+
+            // 0x0D: DEC C
+            0x0D => {
+                self.registers.c = self.registers.dec_u8(self.registers.c);
+                4
+            }
+
+            // 0x0E: LD C n8
+            0x0E => {
+                self.registers.c = self.fetch();
+                8
+            }
+
+            // 0x0F: RRCA
+            0x0F => {
+                self.registers.set_flag_z(false);
+                self.registers.set_flag_n(false);
+                self.registers.set_flag_h(false);
+
+                self.registers.set_flag_c(self.registers.a & 1 == 1);
+
+                self.registers.a = self.registers.a.rotate_right(1);
+                4
+            }
 
             _ => {
                 println!("Warning: opcode {:X} not implemented", opcode);

@@ -2,6 +2,15 @@ use crate::bus::Bus;
 
 struct Register8(u8);
 
+fn get_r16(high: &Register8, low: &Register8) -> u16 {
+    (high.0 as u16) << 8 | low.0 as u16
+}
+
+fn set_r16(val: u16, &mut high: Register8, &mut low: Register8) {
+    low.0 = val as u8;
+    high.0 = (val >> 8) as u8;
+}
+
 pub struct CPU<'a> {
     a: Register8,
     f: Register8,

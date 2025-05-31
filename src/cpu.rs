@@ -1,139 +1,37 @@
 use crate::bus::Bus;
 
-// separate registers into their 8-bit components, but allow methods to read/write as either 8 or
-// 16 bit
-struct Registers {
-    a: u8,
-    f: u8,
-    b: u8,
-    c: u8,
-    h: u8,
-    l: u8,
-    sp: u16,
-    pc: u16,
-}
-
-impl Registers {
-    fn init() -> Registers {
-        Registers {
-            a: 0,
-            f: 0,
-            b: 0,
-            c: 0,
-            h: 0,
-            l: 0,
-            sp: 0xFFFE,
-            pc: 0x100,
-        }
-    }
-
-    fn get_bc(&self) -> u16 {
-        (self.b as u16) << 8 | self.c as u16
-    }
-
-    fn set_bc(&mut self, val: u16) {
-        self.c = val as u8;
-        self.b = (val >> 8) as u8;
-    }
-
-    fn get_hl(&self) -> u16 {
-        (self.h as u16) << 8 | self.l as u16
-    }
-
-    fn set_hl(&mut self, val: u16) {
-        self.l = val as u8;
-        self.h = (val >> 8) as u8;
-    }
-
-    fn set_flag_z(&mut self, on: bool) {
-        if on {
-            self.f |= 0b0000_0001
-        } else {
-            self.f &= 0b1111_1110
-        }
-    }
-
-    fn set_flag_n(&mut self, on: bool) {
-        if on {
-            self.f |= 0b0000_0010
-        } else {
-            self.f &= 0b1111_1101
-        }
-    }
-
-    fn set_flag_h(&mut self, on: bool) {
-        if on {
-            self.f |= 0b0000_0100
-        } else {
-            self.f &= 0b1111_1011
-        }
-    }
-
-    fn set_flag_c(&mut self, on: bool) {
-        if on {
-            self.f |= 0b0000_1000
-        } else {
-            self.f &= 0b1111_0111
-        }
-    }
-
-    fn inc_u8(&mut self, reg: u8) -> u8 {
-        // check overflow from bit 3 (bits 0-3 are on)
-        if reg & 0x0F == 0x0F {
-            self.set_flag_h(true);
-        }
-
-        let r = reg.wrapping_add(1);
-        self.set_flag_n(false);
-
-        if r == 0 {
-            self.set_flag_z(true);
-        }
-
-        r
-    }
-
-    fn dec_u8(&mut self, reg: u8) -> u8 {
-        // check if a borrow from bit 4 is required (bits 0-3 are off)
-        if reg & 0x0F == 0 {
-            self.set_flag_h(true);
-        }
-
-        let r = reg.wrapping_sub(1);
-        self.set_flag_n(true);
-
-        if r == 0 {
-            self.set_flag_z(true);
-        }
-
-        r
-    }
-}
+struct Register8(u8);
 
 pub struct CPU<'a> {
-    registers: Registers,
+    a: Register8,
+    f: Register8,
+    b: Register8,
+    c: Register8,
+    h: Register8,
+    l: Register8,
+    sp: u16,
+    pc: u16,
     bus: &'a mut Bus<'a>,
 }
 
 impl CPU<'_> {
     pub fn init<'a>(bus: &'a mut Bus<'a>) -> CPU<'a> {
         CPU {
-            registers: Registers::init(),
+            a: Register8(0),
+            f: Register8(0),
+            b: Register8(0),
+            c: Register8(0),
+            h: Register8(0),
+            l: Register8(0),
+            sp: 0xFFFE,
+            pc: 0x100,
             bus,
         }
     }
 
-    fn bus_read(&self, address: usize) -> u8 {
-        self.bus.read(address)
-    }
-
-    fn bus_write(&mut self, address: usize, value: u8) {
-        self.bus.write(address, value);
-    }
-
     fn fetch(&mut self) -> u8 {
-        let byte = self.bus_read(self.registers.pc as usize);
-        self.registers.pc += 1;
+        let byte = self.bus.read(self.pc as usize);
+        self.pc += 1;
         byte
     }
 
@@ -142,6 +40,38 @@ impl CPU<'_> {
         let low = self.fetch() as u16;
         let high = self.fetch() as u16;
         (high << 8) | low
+    }
+
+    fn set_flag_z(&mut self, on: bool) {
+        if on {
+            self.f.0 |= 0b0000_0001
+        } else {
+            self.f.0 &= 0b1111_1110
+        }
+    }
+
+    fn set_flag_n(&mut self, on: bool) {
+        if on {
+            self.f.0 |= 0b0000_0010
+        } else {
+            self.f.0 &= 0b1111_1101
+        }
+    }
+
+    fn set_flag_h(&mut self, on: bool) {
+        if on {
+            self.f.0 |= 0b0000_0100
+        } else {
+            self.f.0 &= 0b1111_1011
+        }
+    }
+
+    fn set_flag_c(&mut self, on: bool) {
+        if on {
+            self.f.0 |= 0b0000_1000
+        } else {
+            self.f.0 &= 0b1111_0111
+        }
     }
 
     // Instructions take a variable amount of CPU cycles

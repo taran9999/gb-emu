@@ -2,32 +2,54 @@ use crate::bus::Bus;
 
 struct Register8(u8);
 
-fn get_r16(high: &Register8, low: &Register8) -> u16 {
-    (high.0 as u16) << 8 | low.0 as u16
-}
+struct Register16<'a>(&'a mut Register8, &'a mut Register8);
 
-fn set_r16(val: u16, high: &mut Register8, low: &mut Register8) {
-    low.0 = val as u8;
-    high.0 = (val >> 8) as u8;
+impl Register16<'_> {
+    fn get(&self) -> u16 {
+        (self.0 .0 as u16) << 8 | self.1 .0 as u16
+    }
+
+    fn set(&mut self, val: u16) {
+        self.1 .0 = val as u8;
+        self.0 .0 = (val >> 8) as u8;
+    }
 }
 
 // for instructions that take r16s, just pass them as the two r8s that make them up
 // TODO: maybe instead of allowing instructions to take mutable references to registers, create an
 // enum consisting of register symbols, and a method which allows the CPU to convert those to the
 // corresponding register.
+
+enum Reg8Symbol {
+    A,
+    F,
+    B,
+    C,
+    D,
+    E,
+    H,
+    L,
+}
+
+enum Reg16Symbol {
+    BC,
+    DE,
+    HL,
+}
+
 #[allow(non_camel_case_types)]
-enum Instruction<'a> {
+enum Instruction {
     NOP,
-    LD_r16_n16(&'a mut Register8, &'a mut Register8),
-    LD_r16_r8(&'a Register8, &'a Register8, &'a Register8),
-    LD_r8_n8(&'a mut Register8),
+    LD_r16_n16(Reg16Symbol),
+    LD_r16_r8(Reg16Symbol, Reg8Symbol),
+    LD_r8_n8(Reg8Symbol),
     LD_a16_SP,
-    LD_r8_r16(&'a mut Register8, &'a Register8, &'a Register8),
-    INC_r16(&'a mut Register8, &'a mut Register8),
-    INC_r8(&'a mut Register8),
-    DEC_r16(&'a mut Register8, &'a mut Register8),
-    DEC_r8(&'a mut Register8),
-    ADD_HL_r16(&'a Register8, &'a Register8),
+    LD_r8_r16(Reg8Symbol, Reg16Symbol),
+    INC_r16(Reg16Symbol),
+    INC_r8(Reg8Symbol),
+    DEC_r16(Reg16Symbol),
+    DEC_r8(Reg8Symbol),
+    ADD_HL_r16(Reg16Symbol),
     RLCA,
     RRCA,
     NotImplemented,
@@ -38,6 +60,8 @@ pub struct CPU<'a> {
     f: Register8,
     b: Register8,
     c: Register8,
+    d: Register8,
+    e: Register8,
     h: Register8,
     l: Register8,
     sp: u16,
@@ -52,6 +76,8 @@ impl CPU<'_> {
             f: Register8(0),
             b: Register8(0),
             c: Register8(0),
+            d: Register8(0),
+            e: Register8(0),
             h: Register8(0),
             l: Register8(0),
             sp: 0xFFFE,
@@ -105,23 +131,44 @@ impl CPU<'_> {
         }
     }
 
+    fn reg8_from_symbol(&mut self, sym: Reg8Symbol) -> &mut Register8 {
+        match sym {
+            Reg8Symbol::A => &mut self.a,
+            Reg8Symbol::F => &mut self.f,
+            Reg8Symbol::B => &mut self.b,
+            Reg8Symbol::C => &mut self.c,
+            Reg8Symbol::D => &mut self.d,
+            Reg8Symbol::E => &mut self.e,
+            Reg8Symbol::H => &mut self.h,
+            Reg8Symbol::L => &mut self.l,
+        }
+    }
+
+    fn reg16_from_symbol(&mut self, sym: Reg16Symbol) -> Register16 {
+        match sym {
+            Reg16Symbol::BC => Register16(&mut self.b, &mut self.c),
+            Reg16Symbol::DE => Register16(&mut self.d, &mut self.e),
+            Reg16Symbol::HL => Register16(&mut self.h, &mut self.l),
+        }
+    }
+
     fn decode(&mut self, opcode: u8) -> Instruction {
         match opcode {
             0x00 => Instruction::NOP,
-            0x01 => Instruction::LD_r16_n16(&mut self.b, &mut self.c),
-            0x02 => Instruction::LD_r16_r8(&self.b, &self.c, &self.a),
-            0x03 => Instruction::INC_r16(&mut self.b, &mut self.c),
-            0x04 => Instruction::INC_r8(&mut self.b),
-            0x05 => Instruction::DEC_r8(&mut self.b),
-            0x06 => Instruction::LD_r8_n8(&mut self.b),
+            0x01 => Instruction::LD_r16_n16(Reg16Symbol::BC),
+            0x02 => Instruction::LD_r16_r8(Reg16Symbol::BC, Reg8Symbol::A),
+            0x03 => Instruction::INC_r16(Reg16Symbol::BC),
+            0x04 => Instruction::INC_r8(Reg8Symbol::B),
+            0x05 => Instruction::DEC_r8(Reg8Symbol::B),
+            0x06 => Instruction::LD_r8_n8(Reg8Symbol::B),
             0x07 => Instruction::RLCA,
             0x08 => Instruction::LD_a16_SP,
-            0x09 => Instruction::ADD_HL_r16(&self.b, &self.c),
-            0x0A => Instruction::LD_r8_r16(&mut self.a, &self.b, &self.c),
-            0x0B => Instruction::DEC_r16(&mut self.b, &mut self.c),
-            0x0C => Instruction::INC_r8(&mut self.c),
-            0x0D => Instruction::DEC_r8(&mut self.c),
-            0x0E => Instruction::LD_r8_n8(&mut self.c),
+            0x09 => Instruction::ADD_HL_r16(Reg16Symbol::BC),
+            0x0A => Instruction::LD_r8_r16(Reg8Symbol::A, Reg16Symbol::BC),
+            0x0B => Instruction::DEC_r16(Reg16Symbol::BC),
+            0x0C => Instruction::INC_r8(Reg8Symbol::C),
+            0x0D => Instruction::DEC_r8(Reg8Symbol::C),
+            0x0E => Instruction::LD_r8_n8(Reg8Symbol::C),
             0x0F => Instruction::RRCA,
             _ => Instruction::NotImplemented,
         }
@@ -134,26 +181,35 @@ impl CPU<'_> {
         match inst {
             Instruction::NOP => 4,
 
-            Instruction::LD_r16_n16(r1, r2) => {
-                r2.0 = self.fetch();
-                r1.0 = self.fetch();
+            Instruction::LD_r16_n16(r16s) => {
+                let r16 = self.reg16_from_symbol(r16s);
+
+                let val = self.fetch_2();
+                r16.set(val);
                 12
             }
 
-            Instruction::LD_r16_r8(r16_1, r16_2, r8) => {
-                let address = get_r16(r16_1, r16_2) as usize;
+            Instruction::LD_r16_r8(r16s, r8s) => {
+                let r16 = self.reg16_from_symbol(r16s);
+                let r8 = self.reg8_from_symbol(r8s);
+
+                let address = r16.get() as usize;
                 let value = r8.0;
                 self.bus.write(address, value);
                 8
             }
 
-            Instruction::INC_r16(r1, r2) => {
-                let val = get_r16(r1, r2).wrapping_add(1);
-                set_r16(val, r1, r2);
+            Instruction::INC_r16(r16s) => {
+                let r16 = self.reg16_from_symbol(r16s);
+
+                let val = r16.get().wrapping_add(1);
+                r16.set(val);
                 8
             }
 
-            Instruction::INC_r8(r) => {
+            Instruction::INC_r8(r8s) => {
+                let r = self.reg8_from_symbol(r8s);
+
                 self.set_flag_n(false);
 
                 // check overflow from bit 3 (bits 0-3 are on)
@@ -170,7 +226,9 @@ impl CPU<'_> {
                 4
             }
 
-            Instruction::DEC_r8(r) => {
+            Instruction::DEC_r8(r8s) => {
+                let r = self.reg8_from_symbol(r8s);
+
                 self.set_flag_n(true);
 
                 // check if a borrow from bit 4 is required (bits 0-3 are off)
@@ -187,7 +245,9 @@ impl CPU<'_> {
                 4
             }
 
-            Instruction::LD_r8_n8(r) => {
+            Instruction::LD_r8_n8(r8s) => {
+                let r = self.reg8_from_symbol(r8s);
+
                 r.0 = self.fetch();
                 8
             }
@@ -214,37 +274,42 @@ impl CPU<'_> {
                 20
             }
 
-            Instruction::ADD_HL_r16(r1, r2) => {
+            Instruction::ADD_HL_r16(r16s) => {
                 self.set_flag_n(false);
 
-                let hl = get_r16(&self.h, &self.l);
-                let r16 = get_r16(r1, r2);
+                let hl = self.reg16_from_symbol(Reg16Symbol::HL).get();
+                let r16 = self.reg16_from_symbol(r16s);
+                let r16_val = r16.get();
 
                 // set flag c on actual overflow
-                let (res, c) = hl.overflowing_add(r16);
+                let (res, c) = hl.overflowing_add(r16_val);
                 if c {
                     self.set_flag_c(true);
                 }
 
                 // set flag h if the sum of the bottom 12 bits activate the 13th bit
-                if (hl & 0x0FFF) + (r16 & 0x0FFF) > 0x0FFF {
+                if (hl & 0x0FFF) + (r16_val & 0x0FFF) > 0x0FFF {
                     self.set_flag_h(true);
                 }
 
-                set_r16(res, &mut self.h, &mut self.l);
+                r16.set(res);
                 8
             }
 
-            Instruction::LD_r8_r16(r8, r16_1, r16_2) => {
+            Instruction::LD_r8_r16(r8s, r16s) => {
                 // get value pointed to by r16 and store in r8
-                let addr = get_r16(r16_1, r16_2);
+                let addr = self.reg16_from_symbol(r16s).get() as usize;
+
+                let r8 = self.reg8_from_symbol(r8s);
                 r8.0 = self.bus.read(addr as usize);
                 8
             }
 
-            Instruction::DEC_r16(r1, r2) => {
-                let val = get_r16(r1, r2).wrapping_sub(1);
-                set_r16(val, r1, r2);
+            Instruction::DEC_r16(r16s) => {
+                let r16 = self.reg16_from_symbol(r16s);
+
+                let val = r16.get().wrapping_sub(1);
+                r16.set(val);
                 8
             }
 

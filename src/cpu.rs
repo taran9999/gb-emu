@@ -6,9 +6,31 @@ fn get_r16(high: &Register8, low: &Register8) -> u16 {
     (high.0 as u16) << 8 | low.0 as u16
 }
 
-fn set_r16(val: u16, &mut high: Register8, &mut low: Register8) {
+fn set_r16(val: u16, high: &mut Register8, low: &mut Register8) {
     low.0 = val as u8;
     high.0 = (val >> 8) as u8;
+}
+
+// for instructions that take r16s, just pass them as the two r8s that make them up
+// TODO: maybe instead of allowing instructions to take mutable references to registers, create an
+// enum consisting of register symbols, and a method which allows the CPU to convert those to the
+// corresponding register.
+#[allow(non_camel_case_types)]
+enum Instruction<'a> {
+    NOP,
+    LD_r16_n16(&'a mut Register8, &'a mut Register8),
+    LD_r16_r8(&'a Register8, &'a Register8, &'a Register8),
+    LD_r8_n8(&'a mut Register8),
+    LD_a16_SP,
+    LD_r8_r16(&'a mut Register8, &'a Register8, &'a Register8),
+    INC_r16(&'a mut Register8, &'a mut Register8),
+    INC_r8(&'a mut Register8),
+    DEC_r16(&'a mut Register8, &'a mut Register8),
+    DEC_r8(&'a mut Register8),
+    ADD_HL_r16(&'a Register8, &'a Register8),
+    RLCA,
+    RRCA,
+    NotImplemented,
 }
 
 pub struct CPU<'a> {
@@ -83,148 +105,167 @@ impl CPU<'_> {
         }
     }
 
+    fn decode(&mut self, opcode: u8) -> Instruction {
+        match opcode {
+            0x00 => Instruction::NOP,
+            0x01 => Instruction::LD_r16_n16(&mut self.b, &mut self.c),
+            0x02 => Instruction::LD_r16_r8(&self.b, &self.c, &self.a),
+            0x03 => Instruction::INC_r16(&mut self.b, &mut self.c),
+            0x04 => Instruction::INC_r8(&mut self.b),
+            0x05 => Instruction::DEC_r8(&mut self.b),
+            0x06 => Instruction::LD_r8_n8(&mut self.b),
+            0x07 => Instruction::RLCA,
+            0x08 => Instruction::LD_a16_SP,
+            0x09 => Instruction::ADD_HL_r16(&self.b, &self.c),
+            0x0A => Instruction::LD_r8_r16(&mut self.a, &self.b, &self.c),
+            0x0B => Instruction::DEC_r16(&mut self.b, &mut self.c),
+            0x0C => Instruction::INC_r8(&mut self.c),
+            0x0D => Instruction::DEC_r8(&mut self.c),
+            0x0E => Instruction::LD_r8_n8(&mut self.c),
+            0x0F => Instruction::RRCA,
+            _ => Instruction::NotImplemented,
+        }
+    }
+
     // Instructions take a variable amount of CPU cycles
     // from https://emudev.de/gameboy-emulator/opcode-cycles-and-timings/ return the number of
     // cycles executed to develop accurate timing. Yields number of T-states.
-    pub fn execute(&mut self) -> u8 {
-        let opcode = self.fetch();
-        match opcode {
-            // 0x00: NOP
-            0x00 => 4,
+    fn execute(&mut self, inst: Instruction) -> u8 {
+        match inst {
+            Instruction::NOP => 4,
 
-            // 0x01: LD BC n16
-            0x01 => {
-                self.registers.c = self.fetch();
-                self.registers.b = self.fetch();
+            Instruction::LD_r16_n16(r1, r2) => {
+                r2.0 = self.fetch();
+                r1.0 = self.fetch();
                 12
             }
 
-            // 0x02: LD [BC] A
-            0x02 => {
-                let address = self.registers.get_bc() as usize;
-                let value = self.registers.a;
-                self.bus_write(address, value);
+            Instruction::LD_r16_r8(r16_1, r16_2, r8) => {
+                let address = get_r16(r16_1, r16_2) as usize;
+                let value = r8.0;
+                self.bus.write(address, value);
                 8
             }
 
-            // 0x03: INC BC
-            0x03 => {
-                self.registers.set_bc(self.registers.get_bc() + 1);
+            Instruction::INC_r16(r1, r2) => {
+                let val = get_r16(r1, r2).wrapping_add(1);
+                set_r16(val, r1, r2);
                 8
             }
 
-            // 0x04: INC B
-            0x04 => {
-                self.registers.b = self.registers.inc_u8(self.registers.b);
+            Instruction::INC_r8(r) => {
+                self.set_flag_n(false);
+
+                // check overflow from bit 3 (bits 0-3 are on)
+                if r.0 & 0x0F == 0x0F {
+                    self.set_flag_h(true);
+                }
+
+                let new_val = r.0.wrapping_add(1);
+                if new_val == 0 {
+                    self.set_flag_z(true);
+                }
+
+                r.0 = new_val;
                 4
             }
 
-            // 0x05: DEC B
-            0x05 => {
-                self.registers.b = self.registers.dec_u8(self.registers.b);
+            Instruction::DEC_r8(r) => {
+                self.set_flag_n(true);
+
+                // check if a borrow from bit 4 is required (bits 0-3 are off)
+                if r.0 & 0x0F == 0 {
+                    self.set_flag_h(true);
+                }
+
+                let new_val = r.0.wrapping_sub(1);
+                if new_val == 0 {
+                    self.set_flag_z(true);
+                }
+
+                r.0 = new_val;
                 4
             }
 
-            // 0x06: LD B n8
-            0x06 => {
-                self.registers.b = self.fetch();
+            Instruction::LD_r8_n8(r) => {
+                r.0 = self.fetch();
                 8
             }
 
-            // 0x07: RLCA
-            0x07 => {
-                self.registers.set_flag_z(false);
-                self.registers.set_flag_n(false);
-                self.registers.set_flag_h(false);
+            Instruction::RLCA => {
+                self.set_flag_z(false);
+                self.set_flag_n(false);
+                self.set_flag_h(false);
 
-                self.registers.a = self.registers.a.rotate_left(1);
+                self.a.0 = self.a.0.rotate_left(1);
 
                 // set flag c to the leftmost bit that was rotated to the least significant
                 // position
-                self.registers.set_flag_c(self.registers.a & 1 == 1);
+                self.set_flag_c(self.a.0 & 1 == 1);
                 4
             }
 
-            // 0x08: LD [a16] SP
-            0x08 => {
+            Instruction::LD_a16_SP => {
                 let addr = self.fetch_2();
 
                 // write SP & 0xFF (low byte) to addr, and SP >> 8 (high byte) to addr + 1
-                self.bus_write(addr as usize, (self.registers.sp & 0xFF) as u8);
-                self.bus_write((addr + 1) as usize, (self.registers.sp >> 8) as u8);
+                self.bus.write(addr as usize, (self.sp & 0xFF) as u8);
+                self.bus.write((addr + 1) as usize, (self.sp >> 8) as u8);
                 20
             }
 
-            // 0x09: ADD HL BC
-            0x09 => {
-                self.registers.set_flag_n(false);
+            Instruction::ADD_HL_r16(r1, r2) => {
+                self.set_flag_n(false);
 
-                let hl = self.registers.get_hl();
-                let bc = self.registers.get_bc();
+                let hl = get_r16(&self.h, &self.l);
+                let r16 = get_r16(r1, r2);
 
                 // set flag c on actual overflow
-                let (res, c) = hl.overflowing_add(bc);
+                let (res, c) = hl.overflowing_add(r16);
                 if c {
-                    self.registers.set_flag_c(true);
+                    self.set_flag_c(true);
                 }
 
                 // set flag h if the sum of the bottom 12 bits activate the 13th bit
-                if (hl & 0x0FFF) + (bc & 0x0FFF) > 0x0FFF {
-                    self.registers.set_flag_h(true);
+                if (hl & 0x0FFF) + (r16 & 0x0FFF) > 0x0FFF {
+                    self.set_flag_h(true);
                 }
 
-                self.registers.set_hl(res);
+                set_r16(res, &mut self.h, &mut self.l);
                 8
             }
 
-            // 0x0A: LD A [BC]
-            0x0A => {
-                // get value pointed to by BC and store in A
-                let addr = self.registers.get_bc();
-                self.registers.a = self.bus_read(addr as usize);
+            Instruction::LD_r8_r16(r8, r16_1, r16_2) => {
+                // get value pointed to by r16 and store in r8
+                let addr = get_r16(r16_1, r16_2);
+                r8.0 = self.bus.read(addr as usize);
                 8
             }
 
-            // 0x0B: DEC BC
-            0x0B => {
-                self.registers.set_bc(self.registers.get_bc() - 1);
+            Instruction::DEC_r16(r1, r2) => {
+                let val = get_r16(r1, r2).wrapping_sub(1);
+                set_r16(val, r1, r2);
                 8
             }
 
-            // 0x0C: INC C
-            0x0C => {
-                self.registers.c = self.registers.inc_u8(self.registers.c);
+            Instruction::RRCA => {
+                self.set_flag_z(false);
+                self.set_flag_n(false);
+                self.set_flag_h(false);
+
+                self.set_flag_c(self.a.0 & 1 == 1);
+
+                self.a.0 = self.a.0.rotate_right(1);
                 4
             }
 
-            // 0x0D: DEC C
-            0x0D => {
-                self.registers.c = self.registers.dec_u8(self.registers.c);
-                4
-            }
-
-            // 0x0E: LD C n8
-            0x0E => {
-                self.registers.c = self.fetch();
-                8
-            }
-
-            // 0x0F: RRCA
-            0x0F => {
-                self.registers.set_flag_z(false);
-                self.registers.set_flag_n(false);
-                self.registers.set_flag_h(false);
-
-                self.registers.set_flag_c(self.registers.a & 1 == 1);
-
-                self.registers.a = self.registers.a.rotate_right(1);
-                4
-            }
-
-            _ => {
-                println!("Warning: opcode {:X} not implemented", opcode);
-                4
-            }
+            Instruction::NotImplemented => 4,
         }
+    }
+
+    pub fn step(&mut self) {
+        let opcode = self.fetch();
+        let inst = self.decode(opcode);
+        self.execute(inst);
     }
 }

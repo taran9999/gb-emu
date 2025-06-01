@@ -59,7 +59,7 @@ fn main() {
     let mut bus = Bus::new(&mut ch);
     let mut cpu = CPU::init(&mut bus);
 
-    for i in 0..5 {
-        cpu.execute();
+    for _ in 0..5 {
+        cpu.step();
     }
 }

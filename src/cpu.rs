@@ -47,6 +47,7 @@ enum Instruction {
     ADD_HL_r16(Reg16Symbol),
     RLCA,
     RRCA,
+    STOP,
     NotImplemented,
 }
 
@@ -165,7 +166,17 @@ impl CPU<'_> {
             0x0D => Instruction::DEC_r8(Reg8Symbol::C),
             0x0E => Instruction::LD_r8_n8(Reg8Symbol::C),
             0x0F => Instruction::RRCA,
-            _ => Instruction::NotImplemented,
+            0x10 => Instruction::STOP,
+            0x11 => Instruction::LD_r16_n16(Reg16Symbol::DE),
+            0x12 => Instruction::LD_r16_r8(Reg16Symbol::DE, Reg8Symbol::A),
+            0x13 => Instruction::INC_r16(Reg16Symbol::DE),
+            0x14 => Instruction::INC_r8(Reg8Symbol::D),
+            0x15 => Instruction::DEC_r8(Reg8Symbol::D),
+            0x16 => Instruction::LD_r8_n8(Reg8Symbol::D),
+            _ => {
+                println!("Warning: no implementation for opcode {:X}", opcode);
+                Instruction::NotImplemented
+            }
         }
     }
 
@@ -312,6 +323,10 @@ impl CPU<'_> {
 
                 self.a.0 = self.a.0.rotate_right(1);
                 4
+            }
+
+            Instruction::STOP => {
+                todo!();
             }
 
             Instruction::NotImplemented => 4,

@@ -47,7 +47,10 @@ enum Instruction {
     ADD_HL_r16(Reg16Symbol),
     RLCA,
     RRCA,
+    RLA,
+    RRA,
     STOP,
+    JR_n16,
     NotImplemented,
 }
 
@@ -127,6 +130,10 @@ impl CPU<'_> {
         }
     }
 
+    fn get_flag_c(&self) -> bool {
+        self.f.0 & 0b0000_1000 == 0b0000_1000
+    }
+
     fn reg8_from_symbol(&mut self, sym: &Reg8Symbol) -> &mut Register8 {
         match sym {
             Reg8Symbol::A => &mut self.a,
@@ -173,6 +180,15 @@ impl CPU<'_> {
             0x14 => Instruction::INC_r8(Reg8Symbol::D),
             0x15 => Instruction::DEC_r8(Reg8Symbol::D),
             0x16 => Instruction::LD_r8_n8(Reg8Symbol::D),
+            0x17 => Instruction::RLA,
+            0x18 => Instruction::JR_n16,
+            0x19 => Instruction::ADD_HL_r16(Reg16Symbol::DE),
+            0x1A => Instruction::LD_r8_r16(Reg8Symbol::A, Reg16Symbol::DE),
+            0x1B => Instruction::DEC_r16(Reg16Symbol::DE),
+            0x1C => Instruction::INC_r8(Reg8Symbol::E),
+            0x1D => Instruction::DEC_r8(Reg8Symbol::E),
+            0x1E => Instruction::LD_r8_n8(Reg8Symbol::E),
+            0x1F => Instruction::RRA,
             _ => {
                 println!("Warning: no implementation for opcode {:X}", opcode);
                 Instruction::NotImplemented
@@ -323,6 +339,51 @@ impl CPU<'_> {
 
                 self.a.0 = self.a.0.rotate_right(1);
                 4
+            }
+
+            Instruction::RLA => {
+                self.set_flag_z(false);
+                self.set_flag_n(false);
+                self.set_flag_h(false);
+
+                // shift left, then set the last bit to current value of c flag, and set c flag to
+                // the shifted out bit
+                let left_bit = self.a.0 & 0b1000_0000 == 0b1000_0000;
+                self.a.0 = self.a.0 << 1;
+
+                if self.get_flag_c() {
+                    self.a.0 |= 0b0000_0001;
+                } else {
+                    self.a.0 &= 0b1111_1110;
+                }
+
+                self.set_flag_c(left_bit);
+                4
+            }
+
+            Instruction::RRA => {
+                self.set_flag_z(false);
+                self.set_flag_n(false);
+                self.set_flag_h(false);
+
+                let right_bit = self.a.0 & 0b0000_0001 == 0b0000_0001;
+                self.a.0 = self.a.0 >> 1;
+
+                if self.get_flag_c() {
+                    self.a.0 |= 0b1000_0000;
+                } else {
+                    self.a.0 &= 0b0111_1111;
+                }
+
+                self.set_flag_c(right_bit);
+                4
+            }
+
+            Instruction::JR_n16 => {
+                let ofs = (self.fetch() as i8) as u16;
+                let addr = self.fetch_2();
+                self.pc = addr + ofs + 2;
+                12
             }
 
             Instruction::STOP => {

@@ -418,18 +418,18 @@ impl CPU<'_> {
             }
 
             Instruction::JR_n16 => {
-                let ofs = (self.fetch() as i8) as u16;
+                let ofs = self.fetch() as i8;
                 let addr = self.fetch_2();
-                self.pc = addr + ofs + 2;
+                self.pc = addr.wrapping_add_signed(ofs.into()) + 2;
                 12
             }
 
             Instruction::JR_n16_Conditional(fls, on) => {
-                let ofs = (self.fetch() as i8) as u16;
+                let ofs = self.fetch() as i8;
                 let flag = self.get_flag(&fls);
                 if flag == on {
                     let addr = self.fetch_2();
-                    self.pc = addr + ofs + 2;
+                    self.pc = addr.wrapping_add_signed(ofs.into()) + 2;
                     12
                 } else {
                     8

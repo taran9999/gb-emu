@@ -32,6 +32,13 @@ enum Reg16Symbol {
     HL,
 }
 
+enum FlagSymbol {
+    Z,
+    N,
+    H,
+    C,
+}
+
 #[allow(non_camel_case_types)]
 enum Instruction {
     NOP,
@@ -51,6 +58,7 @@ enum Instruction {
     RRA,
     STOP,
     JR_n16,
+    JR_n16_Conditional(FlagSymbol, bool),
     NotImplemented,
 }
 
@@ -130,8 +138,38 @@ impl CPU<'_> {
         }
     }
 
+    fn get_flag_z(&self) -> bool {
+        self.f.0 & 0b0000_0001 == 0b0000_0001
+    }
+
+    fn get_flag_n(&self) -> bool {
+        self.f.0 & 0b0000_0010 == 0b0000_0010
+    }
+
+    fn get_flag_h(&self) -> bool {
+        self.f.0 & 0b0000_0100 == 0b0000_0100
+    }
+
     fn get_flag_c(&self) -> bool {
         self.f.0 & 0b0000_1000 == 0b0000_1000
+    }
+
+    fn set_flag(&mut self, flag: &FlagSymbol, on: bool) {
+        match flag {
+            FlagSymbol::Z => self.set_flag_z(on),
+            FlagSymbol::N => self.set_flag_n(on),
+            FlagSymbol::H => self.set_flag_h(on),
+            FlagSymbol::C => self.set_flag_c(on),
+        }
+    }
+
+    fn get_flag(&self, flag: &FlagSymbol) -> bool {
+        match flag {
+            FlagSymbol::Z => self.get_flag_z(),
+            FlagSymbol::N => self.get_flag_n(),
+            FlagSymbol::H => self.get_flag_h(),
+            FlagSymbol::C => self.get_flag_c(),
+        }
     }
 
     fn reg8_from_symbol(&mut self, sym: &Reg8Symbol) -> &mut Register8 {
@@ -384,6 +422,18 @@ impl CPU<'_> {
                 let addr = self.fetch_2();
                 self.pc = addr + ofs + 2;
                 12
+            }
+
+            Instruction::JR_n16_Conditional(fls, on) => {
+                let ofs = (self.fetch() as i8) as u16;
+                let flag = self.get_flag(&fls);
+                if flag == on {
+                    let addr = self.fetch_2();
+                    self.pc = addr + ofs + 2;
+                    12
+                } else {
+                    8
+                }
             }
 
             Instruction::STOP => {

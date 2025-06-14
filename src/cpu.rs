@@ -30,6 +30,8 @@ enum Reg16Symbol {
     BC,
     DE,
     HL,
+    HLI,
+    HLD
 }
 
 enum FlagSymbol {
@@ -189,8 +191,22 @@ impl CPU<'_> {
         match sym {
             Reg16Symbol::BC => Register16(&mut self.b, &mut self.c),
             Reg16Symbol::DE => Register16(&mut self.d, &mut self.e),
-            Reg16Symbol::HL => Register16(&mut self.h, &mut self.l),
+            Reg16Symbol::HL | Reg16Symbol::HLI | Reg16Symbol::HLD => Register16(&mut self.h, &mut self.l),
         }
+    }
+
+    fn inc_r16(&mut self, r16s: Reg16Symbol) -> u8 {
+        let mut r16 = self.reg16_from_symbol(&r16s);
+        let val = r16.get().wrapping_add(1);
+        r16.set(val);
+        8
+    }
+
+    fn dec_r16(&mut self, r16s: Reg16Symbol) -> u8 {
+        let mut r16 = self.reg16_from_symbol(&r16s);
+        let val = r16.get().wrapping_sub(1);
+        r16.set(val);
+        8
     }
 
     fn decode(&mut self, opcode: u8) -> Instruction {
@@ -227,6 +243,9 @@ impl CPU<'_> {
             0x1D => Instruction::DEC_r8(Reg8Symbol::E),
             0x1E => Instruction::LD_r8_n8(Reg8Symbol::E),
             0x1F => Instruction::RRA,
+            0x20 => Instruction::JR_n16_Conditional(FlagSymbol::Z, false),
+            0x21 => Instruction::LD_r16_n16(Reg16Symbol::DE),
+            0x22 => 
             _ => {
                 println!("Warning: no implementation for opcode {:X}", opcode);
                 Instruction::NotImplemented
@@ -255,15 +274,11 @@ impl CPU<'_> {
                 let r8 = self.reg8_from_symbol(&r8s);
                 let value = r8.0;
                 self.bus.write(address, value);
+
                 8
             }
 
-            Instruction::INC_r16(r16s) => {
-                let mut r16 = self.reg16_from_symbol(&r16s);
-                let val = r16.get().wrapping_add(1);
-                r16.set(val);
-                8
-            }
+            Instruction::INC_r16(r16s) => self.inc_r16(r16s),
 
             Instruction::INC_r8(r8s) => {
                 let r = self.reg8_from_symbol(&r8s).0;
@@ -360,13 +375,7 @@ impl CPU<'_> {
                 8
             }
 
-            Instruction::DEC_r16(r16s) => {
-                let mut r16 = self.reg16_from_symbol(&r16s);
-
-                let val = r16.get().wrapping_sub(1);
-                r16.set(val);
-                8
-            }
+            Instruction::DEC_r16(r16s) => self.dec_r16(r16s),
 
             Instruction::RRCA => {
                 self.set_flag_z(false);

@@ -26,12 +26,13 @@ enum Reg8Symbol {
     L,
 }
 
+#[derive(PartialEq, Eq)]
 enum Reg16Symbol {
     BC,
     DE,
     HL,
     HLI,
-    HLD
+    HLD,
 }
 
 enum FlagSymbol {
@@ -61,6 +62,8 @@ enum Instruction {
     STOP,
     JR_n16,
     JR_n16_Conditional(FlagSymbol, bool),
+    DAA,
+    CPL,
     NotImplemented,
 }
 
@@ -191,7 +194,9 @@ impl CPU<'_> {
         match sym {
             Reg16Symbol::BC => Register16(&mut self.b, &mut self.c),
             Reg16Symbol::DE => Register16(&mut self.d, &mut self.e),
-            Reg16Symbol::HL | Reg16Symbol::HLI | Reg16Symbol::HLD => Register16(&mut self.h, &mut self.l),
+            Reg16Symbol::HL | Reg16Symbol::HLI | Reg16Symbol::HLD => {
+                Register16(&mut self.h, &mut self.l)
+            }
         }
     }
 
@@ -245,7 +250,20 @@ impl CPU<'_> {
             0x1F => Instruction::RRA,
             0x20 => Instruction::JR_n16_Conditional(FlagSymbol::Z, false),
             0x21 => Instruction::LD_r16_n16(Reg16Symbol::DE),
-            0x22 => 
+            0x22 => Instruction::LD_r16_r8(Reg16Symbol::HLI, Reg8Symbol::A),
+            0x23 => Instruction::INC_r16(Reg16Symbol::HL),
+            0x24 => Instruction::INC_r8(Reg8Symbol::H),
+            0x25 => Instruction::DEC_r8(Reg8Symbol::H),
+            0x26 => Instruction::LD_r8_n8(Reg8Symbol::H),
+            0x27 => Instruction::DAA,
+            0x28 => Instruction::JR_n16_Conditional(FlagSymbol::Z, true),
+            0x29 => Instruction::ADD_HL_r16(Reg16Symbol::HL),
+            0x2A => Instruction::LD_r8_r16(Reg8Symbol::A, Reg16Symbol::HLI),
+            0x2B => Instruction::DEC_r16(Reg16Symbol::HL),
+            0x2C => Instruction::INC_r8(Reg8Symbol::L),
+            0x2D => Instruction::DEC_r8(Reg8Symbol::L),
+            0x2E => Instruction::LD_r8_n8(Reg8Symbol::L),
+            0x2F => Instruction::CPL
             _ => {
                 println!("Warning: no implementation for opcode {:X}", opcode);
                 Instruction::NotImplemented
@@ -274,6 +292,12 @@ impl CPU<'_> {
                 let r8 = self.reg8_from_symbol(&r8s);
                 let value = r8.0;
                 self.bus.write(address, value);
+
+                if r16s == Reg16Symbol::HLI {
+                    self.inc_r16(r16s);
+                } else if r16s == Reg16Symbol::HLD {
+                    self.dec_r16(r16s);
+                }
 
                 8
             }
@@ -372,6 +396,13 @@ impl CPU<'_> {
                 let addr = self.reg16_from_symbol(&r16s).get() as usize;
                 let val = self.bus.read(addr as usize);
                 self.reg8_from_symbol(&r8s).0 = val;
+
+                if r16s == Reg16Symbol::HLI {
+                    self.inc_r16(r16s);
+                } else if r16s == Reg16Symbol::HLD {
+                    self.dec_r16(r16s);
+                }
+
                 8
             }
 
@@ -447,6 +478,48 @@ impl CPU<'_> {
 
             Instruction::STOP => {
                 todo!();
+            }
+
+            Instruction::DAA => {
+                let mut adj = 0;
+                self.set_flag_h(false);
+
+                if self.get_flag_n() {
+                    if self.get_flag_h() {
+                        adj += 0x06;
+                    }
+
+                    if self.get_flag_c() {
+                        adj += 0x60;
+                    }
+
+                    self.a.0 -= adj;
+                } else {
+                    if self.get_flag_h() || self.a.0 & 0x0F > 0x09 {
+                        adj += 0x06;
+                    }
+
+                    if self.get_flag_c() || self.a.0 > 0x99 {
+                        adj += 0x60;
+                        self.set_flag_c(true);
+                    }
+
+                    self.a.0 += adj;
+                }
+
+                if self.a.0 == 0 {
+                    self.set_flag_z(true);
+                }
+
+                4
+            }
+
+            Instruction::CPL => {
+                self.set_flag_n(true);
+                self.set_flag_h(true);
+
+                self.a.0 = !self.a.0;
+                4
             }
 
             Instruction::NotImplemented => 4,

@@ -50,11 +50,16 @@ enum Instruction {
     LD_r8_n8(Reg8Symbol),
     LD_a16_SP,
     LD_r8_r16(Reg8Symbol, Reg16Symbol),
+    LD_SP_n16,
+    LD_HL_n8,
     INC_r16(Reg16Symbol),
     INC_r8(Reg8Symbol),
+    INC_SP,
     DEC_r16(Reg16Symbol),
     DEC_r8(Reg8Symbol),
+    DEC_SP,
     ADD_HL_r16(Reg16Symbol),
+    ADD_HL_SP,
     RLCA,
     RRCA,
     RLA,
@@ -64,6 +69,8 @@ enum Instruction {
     JR_n16_Conditional(FlagSymbol, bool),
     DAA,
     CPL,
+    SCF,
+    CCF,
     NotImplemented,
 }
 
@@ -214,6 +221,21 @@ impl CPU<'_> {
         8
     }
 
+    fn sum_u16_with_flags(&mut self, n1: u16, n2: u16) -> u16 {
+        // set flag c on actual overflow
+        let (res, c) = n1.overflowing_add(n2);
+        if c {
+            self.set_flag_c(true);
+        }
+
+        // set flag h if the sum of the bottom 12 bits activate the 13th bit
+        if (n1 & 0x0FFF) + (n2 & 0x0FFF) > 0x0FFF {
+            self.set_flag_h(true);
+        }
+
+        res
+    }
+
     fn decode(&mut self, opcode: u8) -> Instruction {
         match opcode {
             0x00 => Instruction::NOP,
@@ -263,7 +285,23 @@ impl CPU<'_> {
             0x2C => Instruction::INC_r8(Reg8Symbol::L),
             0x2D => Instruction::DEC_r8(Reg8Symbol::L),
             0x2E => Instruction::LD_r8_n8(Reg8Symbol::L),
-            0x2F => Instruction::CPL
+            0x2F => Instruction::CPL,
+            0x30 => Instruction::JR_n16_Conditional(FlagSymbol::C, false),
+            0x31 => Instruction::LD_SP_n16,
+            0x32 => Instruction::LD_r16_r8(Reg16Symbol::HLD, Reg8Symbol::A),
+            0x33 => Instruction::INC_SP,
+            0x34 => Instruction::INC_r16(Reg16Symbol::HL),
+            0x35 => Instruction::DEC_r16(Reg16Symbol::HL),
+            0x36 => Instruction::LD_HL_n8,
+            0x37 => Instruction::SCF,
+            0x38 => Instruction::JR_n16_Conditional(FlagSymbol::C, true),
+            0x39 => Instruction::ADD_HL_SP,
+            0x3A => Instruction::LD_r8_r16(Reg8Symbol::A, Reg16Symbol::HLD),
+            0x3B => Instruction::DEC_SP,
+            0x3C => Instruction::INC_r8(Reg8Symbol::A),
+            0x3D => Instruction::DEC_r8(Reg8Symbol::A),
+            0x3E => Instruction::LD_r8_n8(Reg8Symbol::A),
+            0x3F => Instruction::CCF,
             _ => {
                 println!("Warning: no implementation for opcode {:X}", opcode);
                 Instruction::NotImplemented
@@ -376,18 +414,9 @@ impl CPU<'_> {
                 let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
                 let r16_val = self.reg16_from_symbol(&r16s).get();
 
-                // set flag c on actual overflow
-                let (res, c) = hl.overflowing_add(r16_val);
-                if c {
-                    self.set_flag_c(true);
-                }
+                let res = self.sum_u16_with_flags(hl, r16_val);
 
-                // set flag h if the sum of the bottom 12 bits activate the 13th bit
-                if (hl & 0x0FFF) + (r16_val & 0x0FFF) > 0x0FFF {
-                    self.set_flag_h(true);
-                }
-
-                self.reg16_from_symbol(&r16s).set(res);
+                self.reg16_from_symbol(&Reg16Symbol::HL).set(res);
                 8
             }
 
@@ -519,6 +548,54 @@ impl CPU<'_> {
                 self.set_flag_h(true);
 
                 self.a.0 = !self.a.0;
+                4
+            }
+
+            Instruction::LD_SP_n16 => {
+                let addr = self.fetch_2();
+                self.sp = addr;
+                12
+            }
+
+            Instruction::INC_SP => {
+                self.sp = self.sp.wrapping_add(1);
+                8
+            }
+
+            Instruction::LD_HL_n8 => {
+                let value = self.fetch();
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL);
+                let address = hl.get() as usize;
+                self.bus.write(address, value);
+                12
+            }
+
+            Instruction::SCF => {
+                self.set_flag_n(false);
+                self.set_flag_h(false);
+                self.set_flag_c(true);
+                4
+            }
+
+            Instruction::ADD_HL_SP => {
+                self.set_flag_n(false);
+
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+
+                let res = self.sum_u16_with_flags(hl, self.sp);
+                self.reg16_from_symbol(&Reg16Symbol::HL).set(res);
+                8
+            }
+
+            Instruction::DEC_SP => {
+                self.sp = self.sp.wrapping_sub(1);
+                8
+            }
+
+            Instruction::CCF => {
+                self.set_flag_n(false);
+                self.set_flag_h(false);
+                self.set_flag_c(!self.get_flag_c());
                 4
             }
 

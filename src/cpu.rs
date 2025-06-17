@@ -52,6 +52,7 @@ enum Instruction {
     LD_r8_r16(Reg8Symbol, Reg16Symbol),
     LD_SP_n16,
     LD_HL_n8,
+    LD_r8_r8(Reg8Symbol, Reg8Symbol),
     INC_r16(Reg16Symbol),
     INC_r8(Reg8Symbol),
     INC_SP,
@@ -71,6 +72,7 @@ enum Instruction {
     CPL,
     SCF,
     CCF,
+    HALT,
     NotImplemented,
 }
 
@@ -302,6 +304,62 @@ impl CPU<'_> {
             0x3D => Instruction::DEC_r8(Reg8Symbol::A),
             0x3E => Instruction::LD_r8_n8(Reg8Symbol::A),
             0x3F => Instruction::CCF,
+            0x40 => Instruction::LD_r8_r8(Reg8Symbol::B, Reg8Symbol::B),
+            0x41 => Instruction::LD_r8_r8(Reg8Symbol::B, Reg8Symbol::C),
+            0x42 => Instruction::LD_r8_r8(Reg8Symbol::B, Reg8Symbol::D),
+            0x43 => Instruction::LD_r8_r8(Reg8Symbol::B, Reg8Symbol::E),
+            0x44 => Instruction::LD_r8_r8(Reg8Symbol::B, Reg8Symbol::H),
+            0x45 => Instruction::LD_r8_r8(Reg8Symbol::B, Reg8Symbol::L),
+            0x46 => Instruction::LD_r8_r16(Reg8Symbol::B, Reg16Symbol::HL),
+            0x47 => Instruction::LD_r8_r8(Reg8Symbol::B, Reg8Symbol::A),
+            0x48 => Instruction::LD_r8_r8(Reg8Symbol::C, Reg8Symbol::B),
+            0x49 => Instruction::LD_r8_r8(Reg8Symbol::C, Reg8Symbol::C),
+            0x4A => Instruction::LD_r8_r8(Reg8Symbol::C, Reg8Symbol::D),
+            0x4B => Instruction::LD_r8_r8(Reg8Symbol::C, Reg8Symbol::E),
+            0x4C => Instruction::LD_r8_r8(Reg8Symbol::C, Reg8Symbol::H),
+            0x4D => Instruction::LD_r8_r8(Reg8Symbol::C, Reg8Symbol::L),
+            0x4E => Instruction::LD_r8_r16(Reg8Symbol::C, Reg16Symbol::HL),
+            0x4F => Instruction::LD_r8_r8(Reg8Symbol::C, Reg8Symbol::A),
+            0x50 => Instruction::LD_r8_r8(Reg8Symbol::D, Reg8Symbol::B),
+            0x51 => Instruction::LD_r8_r8(Reg8Symbol::D, Reg8Symbol::C),
+            0x52 => Instruction::LD_r8_r8(Reg8Symbol::D, Reg8Symbol::D),
+            0x53 => Instruction::LD_r8_r8(Reg8Symbol::D, Reg8Symbol::E),
+            0x54 => Instruction::LD_r8_r8(Reg8Symbol::D, Reg8Symbol::H),
+            0x55 => Instruction::LD_r8_r8(Reg8Symbol::D, Reg8Symbol::L),
+            0x56 => Instruction::LD_r8_r16(Reg8Symbol::D, Reg16Symbol::HL),
+            0x57 => Instruction::LD_r8_r8(Reg8Symbol::D, Reg8Symbol::A),
+            0x58 => Instruction::LD_r8_r8(Reg8Symbol::E, Reg8Symbol::B),
+            0x59 => Instruction::LD_r8_r8(Reg8Symbol::E, Reg8Symbol::C),
+            0x5A => Instruction::LD_r8_r8(Reg8Symbol::E, Reg8Symbol::D),
+            0x5B => Instruction::LD_r8_r8(Reg8Symbol::E, Reg8Symbol::E),
+            0x5C => Instruction::LD_r8_r8(Reg8Symbol::E, Reg8Symbol::H),
+            0x5D => Instruction::LD_r8_r8(Reg8Symbol::E, Reg8Symbol::L),
+            0x5E => Instruction::LD_r8_r16(Reg8Symbol::E, Reg16Symbol::HL),
+            0x5F => Instruction::LD_r8_r8(Reg8Symbol::E, Reg8Symbol::A),
+            0x60 => Instruction::LD_r8_r8(Reg8Symbol::H, Reg8Symbol::B),
+            0x61 => Instruction::LD_r8_r8(Reg8Symbol::H, Reg8Symbol::C),
+            0x62 => Instruction::LD_r8_r8(Reg8Symbol::H, Reg8Symbol::D),
+            0x63 => Instruction::LD_r8_r8(Reg8Symbol::H, Reg8Symbol::E),
+            0x64 => Instruction::LD_r8_r8(Reg8Symbol::H, Reg8Symbol::H),
+            0x65 => Instruction::LD_r8_r8(Reg8Symbol::H, Reg8Symbol::L),
+            0x66 => Instruction::LD_r8_r16(Reg8Symbol::H, Reg16Symbol::HL),
+            0x67 => Instruction::LD_r8_r8(Reg8Symbol::H, Reg8Symbol::A),
+            0x68 => Instruction::LD_r8_r8(Reg8Symbol::L, Reg8Symbol::B),
+            0x69 => Instruction::LD_r8_r8(Reg8Symbol::L, Reg8Symbol::C),
+            0x6A => Instruction::LD_r8_r8(Reg8Symbol::L, Reg8Symbol::D),
+            0x6B => Instruction::LD_r8_r8(Reg8Symbol::L, Reg8Symbol::E),
+            0x6C => Instruction::LD_r8_r8(Reg8Symbol::L, Reg8Symbol::H),
+            0x6D => Instruction::LD_r8_r8(Reg8Symbol::L, Reg8Symbol::L),
+            0x6E => Instruction::LD_r8_r16(Reg8Symbol::L, Reg16Symbol::HL),
+            0x6F => Instruction::LD_r8_r8(Reg8Symbol::L, Reg8Symbol::A),
+            0x70 => Instruction::LD_r16_r8(Reg16Symbol::HL, Reg8Symbol::B),
+            0x71 => Instruction::LD_r16_r8(Reg16Symbol::HL, Reg8Symbol::C),
+            0x72 => Instruction::LD_r16_r8(Reg16Symbol::HL, Reg8Symbol::D),
+            0x73 => Instruction::LD_r16_r8(Reg16Symbol::HL, Reg8Symbol::E),
+            0x74 => Instruction::LD_r16_r8(Reg16Symbol::HL, Reg8Symbol::H),
+            0x75 => Instruction::LD_r16_r8(Reg16Symbol::HL, Reg8Symbol::L),
+            0x76 => Instruction::HALT,
+            0x77 => Instruction::LD_r16_r8(Reg16Symbol::HL, Reg8Symbol::A),
             _ => {
                 println!("Warning: no implementation for opcode {:X}", opcode);
                 Instruction::NotImplemented
@@ -596,6 +654,15 @@ impl CPU<'_> {
                 self.set_flag_n(false);
                 self.set_flag_h(false);
                 self.set_flag_c(!self.get_flag_c());
+                4
+            }
+
+            Instruction::LD_r8_r8(r8s1, r8s2) => {
+                // copy value at r82 to r81
+                let r82 = self.reg8_from_symbol(&r8s2);
+                let val = r82.0;
+                let r81 = self.reg8_from_symbol(&r8s1);
+                r81.0 = val;
                 4
             }
 

@@ -360,6 +360,15 @@ impl CPU<'_> {
             0x75 => Instruction::LD_r16_r8(Reg16Symbol::HL, Reg8Symbol::L),
             0x76 => Instruction::HALT,
             0x77 => Instruction::LD_r16_r8(Reg16Symbol::HL, Reg8Symbol::A),
+            0x78 => Instruction::LD_r8_r8(Reg8Symbol::A, Reg8Symbol::B),
+            0x79 => Instruction::LD_r8_r8(Reg8Symbol::A, Reg8Symbol::C),
+            0x7A => Instruction::LD_r8_r8(Reg8Symbol::A, Reg8Symbol::D),
+            0x7B => Instruction::LD_r8_r8(Reg8Symbol::A, Reg8Symbol::E),
+            0x7C => Instruction::LD_r8_r8(Reg8Symbol::A, Reg8Symbol::H),
+            0x7D => Instruction::LD_r8_r8(Reg8Symbol::A, Reg8Symbol::L),
+            0x7E => Instruction::LD_r8_r16(Reg8Symbol::A, Reg16Symbol::HL),
+            0x7F => Instruction::LD_r8_r8(Reg8Symbol::A, Reg8Symbol::A),
+
             _ => {
                 println!("Warning: no implementation for opcode {:X}", opcode);
                 Instruction::NotImplemented

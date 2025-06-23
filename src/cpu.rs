@@ -1,5 +1,8 @@
 use crate::bus::Bus;
 
+#[cfg(test)]
+mod tests;
+
 struct Register8(u8);
 
 struct Register16<'a>(&'a mut Register8, &'a mut Register8);
@@ -573,6 +576,10 @@ impl CPU<'_> {
             }
 
             Instruction::STOP => {
+                todo!();
+            }
+
+            Instruction::HALT => {
                 todo!();
             }
 

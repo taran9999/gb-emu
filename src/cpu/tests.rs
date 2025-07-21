@@ -3,16 +3,22 @@ use crate::bus::Bus;
 use crate::cart::Cart;
 
 macro_rules! setup {
-    () => {
-        let rom = [0u8; 32 * 1024];
-        let mut cart = Cart::read_rom(&rom);
-        let mut bus = Bus::new(&mut cart);
-        let mut cpu = CPU::init(&mut bus);
-    };
+    ($($addr:expr => $value:expr),*) => {{
+        let mut rom = [0u8; 32 * 1024];
+        $( rom[$addr] = $value; )*
+
+        let mut cpu = {
+            let mut cart = Cart::read_rom(&rom);
+            let mut bus = Bus::new(&mut cart);
+            CPU::init(&mut bus);
+        };
+
+        (rom, cpu)
+    }};
 }
 
 #[test]
 fn random_test() {
-    setup!();
-    assert!(true);
+    let (rom, cpu) = setup!(0x1000 => 0xAB);
+    assert!(rom[0x1000] == 0xAB)
 }

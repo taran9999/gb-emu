@@ -48,6 +48,7 @@ enum FlagSymbol {
 #[allow(non_camel_case_types)]
 enum Instruction {
     NOP,
+
     LD_r16_n16(Reg16Symbol),
     LD_r16_r8(Reg16Symbol, Reg8Symbol),
     LD_r8_n8(Reg8Symbol),
@@ -56,26 +57,55 @@ enum Instruction {
     LD_SP_n16,
     LD_HL_n8,
     LD_r8_r8(Reg8Symbol, Reg8Symbol),
+
     INC_r16(Reg16Symbol),
     INC_r8(Reg8Symbol),
     INC_SP,
+
     DEC_r16(Reg16Symbol),
     DEC_r8(Reg8Symbol),
     DEC_SP,
+
     ADD_HL_r16(Reg16Symbol),
     ADD_HL_SP,
+    ADD_A_r8(Reg8Symbol),
+    ADD_A_HL,
+
+    ADC_A_r8(Reg8Symbol),
+    ADC_A_HL,
+
+    SUB_A_r8(Reg8Symbol),
+    SUB_A_HL,
+
+    SBC_A_r8(Reg8Symbol),
+    SBC_A_HL,
+
+    AND_A_r8(Reg8Symbol),
+    AND_A_HL,
+
+    XOR_A_r8(Reg8Symbol),
+    XOR_A_HL,
+
+    OR_A_r8(Reg8Symbol),
+    OR_A_HL,
+
+    CP_A_r8(Reg8Symbol),
+    CP_A_HL,
+
+    JR_n16,
+    JR_n16_Conditional(FlagSymbol, bool),
+
     RLCA,
     RRCA,
     RLA,
     RRA,
     STOP,
-    JR_n16,
-    JR_n16_Conditional(FlagSymbol, bool),
     DAA,
     CPL,
     SCF,
     CCF,
     HALT,
+
     NotImplemented,
 }
 
@@ -679,6 +709,24 @@ impl CPU<'_> {
                 let val = r82.0;
                 let r81 = self.reg8_from_symbol(&r8s1);
                 r81.0 = val;
+                4
+            }
+
+            Instruction::ADD_A_r8(r8s) => {
+                let reg = self.reg8_from_symbol(&r8s);
+                let val = reg.0;
+
+                // overflow from bit 3
+                self.set_flag_h((self.a.0 & 0xF) as u16 + (val & 0xF) as u16 > 0xF);
+
+                // overflow from bit 7
+                let (res, c) = self.a.0.overflowing_add(val);
+                self.set_flag_c(c);
+
+                self.a.0 = res;
+
+                self.set_flag_z(res == 0);
+                self.set_flag_n(false);
                 4
             }
 

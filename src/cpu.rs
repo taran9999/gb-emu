@@ -259,14 +259,10 @@ impl CPU<'_> {
     fn sum_u16_with_flags(&mut self, n1: u16, n2: u16) -> u16 {
         // set flag c on actual overflow
         let (res, c) = n1.overflowing_add(n2);
-        if c {
-            self.set_flag_c(true);
-        }
+        self.set_flag_c(c);
 
         // set flag h if the sum of the bottom 12 bits activate the 13th bit
-        if (n1 & 0x0FFF) + (n2 & 0x0FFF) > 0x0FFF {
-            self.set_flag_h(true);
-        }
+        self.set_flag_h((n1 & 0xFFF) as u32 + (n2 & 0xFFF) as u32 > 0xFFF);
 
         res
     }
@@ -448,14 +444,10 @@ impl CPU<'_> {
                 self.set_flag_n(false);
 
                 // check overflow from bit 3 (bits 0-3 are on)
-                if r & 0x0F == 0x0F {
-                    self.set_flag_h(true);
-                }
+                self.set_flag_h(r & 0xF == 0xF);
 
                 let new_val = r.wrapping_add(1);
-                if new_val == 0 {
-                    self.set_flag_z(true);
-                }
+                self.set_flag_z(new_val == 0);
 
                 self.reg8_from_symbol(&r8s).0 = r;
                 4

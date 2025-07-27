@@ -397,6 +397,7 @@ impl CPU<'_> {
             0x7D => Instruction::LD_r8_r8(Reg8Symbol::A, Reg8Symbol::L),
             0x7E => Instruction::LD_r8_r16(Reg8Symbol::A, Reg16Symbol::HL),
             0x7F => Instruction::LD_r8_r8(Reg8Symbol::A, Reg8Symbol::A),
+            0x80 => Instruction::ADD_A_r8(Reg8Symbol::B),
 
             _ => {
                 println!("Warning: no implementation for opcode {:X}", opcode);
@@ -723,6 +724,8 @@ impl CPU<'_> {
             }
 
             Instruction::NotImplemented => 4,
+
+            _ => todo!(), // temporary, just to compile for testing
         }
     }
 

@@ -97,7 +97,7 @@ fn add_a_r8(
 }
 
 fn ld_r8_r8(src_reg: Reg8Symbol, target_reg: Reg8Symbol, src_init: u8) {
-    let opcode_base = match src_reg {
+    let opcode_base = match target_reg {
         Reg8Symbol::B => 0x40,
         Reg8Symbol::C => 0x48,
         Reg8Symbol::D => 0x50,
@@ -109,7 +109,7 @@ fn ld_r8_r8(src_reg: Reg8Symbol, target_reg: Reg8Symbol, src_init: u8) {
     };
 
     let opcode = opcode_base
-        + match target_reg {
+        + match src_reg {
             Reg8Symbol::B => 0,
             Reg8Symbol::C => 1,
             Reg8Symbol::D => 2,

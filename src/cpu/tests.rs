@@ -96,6 +96,69 @@ fn add_a_r8(
     );
 }
 
+fn ld_r8_r8(src_reg: Reg8Symbol, target_reg: Reg8Symbol, src_init: u8) {
+    let opcode_base = match src_reg {
+        Reg8Symbol::B => 0x40,
+        Reg8Symbol::C => 0x48,
+        Reg8Symbol::D => 0x50,
+        Reg8Symbol::E => 0x58,
+        Reg8Symbol::H => 0x60,
+        Reg8Symbol::L => 0x68,
+        Reg8Symbol::A => 0x78,
+        Reg8Symbol::F => panic!("No opcode with F src reg"),
+    };
+
+    let opcode = opcode_base
+        + match target_reg {
+            Reg8Symbol::B => 0,
+            Reg8Symbol::C => 1,
+            Reg8Symbol::D => 2,
+            Reg8Symbol::E => 3,
+            Reg8Symbol::H => 4,
+            Reg8Symbol::L => 5,
+            Reg8Symbol::A => 7,
+            Reg8Symbol::F => panic!("No opcode with F target reg"),
+        };
+
+    let mut rom = [0u8; 32 * 1024];
+    rom[0x100] = opcode;
+
+    let mut cart = Cart::read_rom(&rom);
+    let mut bus = Bus::new(&mut cart);
+    let mut cpu = CPU::init(&mut bus);
+
+    let src = cpu.reg8_from_symbol(&src_reg);
+    src.0 = src_init;
+
+    cpu.step();
+
+    let src_val = cpu.reg8_from_symbol(&src_reg).0;
+    let target_val = cpu.reg8_from_symbol(&target_reg).0;
+
+    assert!(
+        src_val == src_init,
+        "Source register lost its value: expected {}, got {}",
+        src_init,
+        src_val
+    );
+    assert!(
+        target_val == src_val,
+        "Target register value does not match source, expected {}, got {}",
+        src_val,
+        target_val
+    );
+}
+
+#[test]
+fn test_ld_r8_r8() {
+    ld_r8_r8(Reg8Symbol::A, Reg8Symbol::B, 1);
+}
+
+#[test]
+fn test_ld_r8_r8_self() {
+    ld_r8_r8(Reg8Symbol::A, Reg8Symbol::A, 1);
+}
+
 #[test]
 fn test_add_a_r8_no_carry() {
     add_a_r8(Reg8Symbol::B, 1, 1, 2, false, false, false, false);

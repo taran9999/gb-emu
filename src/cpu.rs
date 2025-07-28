@@ -49,14 +49,14 @@ enum FlagSymbol {
 enum Instruction {
     NOP,
 
-    LD_r16_n16(Reg16Symbol),
-    LD_r16_r8(Reg16Symbol, Reg8Symbol),
+    LD_r8_r8(Reg8Symbol, Reg8Symbol),
     LD_r8_n8(Reg8Symbol),
-    LD_a16_SP,
     LD_r8_r16(Reg8Symbol, Reg16Symbol),
+    LD_r16_r8(Reg16Symbol, Reg8Symbol),
+    LD_r16_n16(Reg16Symbol),
+    LD_a16_SP,
     LD_SP_n16,
     LD_HL_n8,
-    LD_r8_r8(Reg8Symbol, Reg8Symbol),
 
     INC_r16(Reg16Symbol),
     INC_r8(Reg8Symbol),
@@ -99,11 +99,11 @@ enum Instruction {
     RRCA,
     RLA,
     RRA,
-    STOP,
     DAA,
     CPL,
     SCF,
     CCF,
+    STOP,
     HALT,
 
     NotImplemented,
@@ -285,6 +285,7 @@ impl CPU<'_> {
             0x0D => Instruction::DEC_r8(Reg8Symbol::C),
             0x0E => Instruction::LD_r8_n8(Reg8Symbol::C),
             0x0F => Instruction::RRCA,
+
             0x10 => Instruction::STOP,
             0x11 => Instruction::LD_r16_n16(Reg16Symbol::DE),
             0x12 => Instruction::LD_r16_r8(Reg16Symbol::DE, Reg8Symbol::A),
@@ -301,6 +302,7 @@ impl CPU<'_> {
             0x1D => Instruction::DEC_r8(Reg8Symbol::E),
             0x1E => Instruction::LD_r8_n8(Reg8Symbol::E),
             0x1F => Instruction::RRA,
+
             0x20 => Instruction::JR_n16_Conditional(FlagSymbol::Z, false),
             0x21 => Instruction::LD_r16_n16(Reg16Symbol::DE),
             0x22 => Instruction::LD_r16_r8(Reg16Symbol::HLI, Reg8Symbol::A),
@@ -317,6 +319,7 @@ impl CPU<'_> {
             0x2D => Instruction::DEC_r8(Reg8Symbol::L),
             0x2E => Instruction::LD_r8_n8(Reg8Symbol::L),
             0x2F => Instruction::CPL,
+
             0x30 => Instruction::JR_n16_Conditional(FlagSymbol::C, false),
             0x31 => Instruction::LD_SP_n16,
             0x32 => Instruction::LD_r16_r8(Reg16Symbol::HLD, Reg8Symbol::A),
@@ -333,6 +336,7 @@ impl CPU<'_> {
             0x3D => Instruction::DEC_r8(Reg8Symbol::A),
             0x3E => Instruction::LD_r8_n8(Reg8Symbol::A),
             0x3F => Instruction::CCF,
+
             0x40 => Instruction::LD_r8_r8(Reg8Symbol::B, Reg8Symbol::B),
             0x41 => Instruction::LD_r8_r8(Reg8Symbol::B, Reg8Symbol::C),
             0x42 => Instruction::LD_r8_r8(Reg8Symbol::B, Reg8Symbol::D),
@@ -349,6 +353,7 @@ impl CPU<'_> {
             0x4D => Instruction::LD_r8_r8(Reg8Symbol::C, Reg8Symbol::L),
             0x4E => Instruction::LD_r8_r16(Reg8Symbol::C, Reg16Symbol::HL),
             0x4F => Instruction::LD_r8_r8(Reg8Symbol::C, Reg8Symbol::A),
+
             0x50 => Instruction::LD_r8_r8(Reg8Symbol::D, Reg8Symbol::B),
             0x51 => Instruction::LD_r8_r8(Reg8Symbol::D, Reg8Symbol::C),
             0x52 => Instruction::LD_r8_r8(Reg8Symbol::D, Reg8Symbol::D),
@@ -365,6 +370,7 @@ impl CPU<'_> {
             0x5D => Instruction::LD_r8_r8(Reg8Symbol::E, Reg8Symbol::L),
             0x5E => Instruction::LD_r8_r16(Reg8Symbol::E, Reg16Symbol::HL),
             0x5F => Instruction::LD_r8_r8(Reg8Symbol::E, Reg8Symbol::A),
+
             0x60 => Instruction::LD_r8_r8(Reg8Symbol::H, Reg8Symbol::B),
             0x61 => Instruction::LD_r8_r8(Reg8Symbol::H, Reg8Symbol::C),
             0x62 => Instruction::LD_r8_r8(Reg8Symbol::H, Reg8Symbol::D),
@@ -381,6 +387,7 @@ impl CPU<'_> {
             0x6D => Instruction::LD_r8_r8(Reg8Symbol::L, Reg8Symbol::L),
             0x6E => Instruction::LD_r8_r16(Reg8Symbol::L, Reg16Symbol::HL),
             0x6F => Instruction::LD_r8_r8(Reg8Symbol::L, Reg8Symbol::A),
+
             0x70 => Instruction::LD_r16_r8(Reg16Symbol::HL, Reg8Symbol::B),
             0x71 => Instruction::LD_r16_r8(Reg16Symbol::HL, Reg8Symbol::C),
             0x72 => Instruction::LD_r16_r8(Reg16Symbol::HL, Reg8Symbol::D),
@@ -397,6 +404,7 @@ impl CPU<'_> {
             0x7D => Instruction::LD_r8_r8(Reg8Symbol::A, Reg8Symbol::L),
             0x7E => Instruction::LD_r8_r16(Reg8Symbol::A, Reg16Symbol::HL),
             0x7F => Instruction::LD_r8_r8(Reg8Symbol::A, Reg8Symbol::A),
+
             0x80 => Instruction::ADD_A_r8(Reg8Symbol::B),
 
             _ => {
@@ -413,11 +421,34 @@ impl CPU<'_> {
         match inst {
             Instruction::NOP => 4,
 
-            Instruction::LD_r16_n16(r16s) => {
-                let val = self.fetch_2();
-                let mut r16 = self.reg16_from_symbol(&r16s);
-                r16.set(val);
-                12
+            Instruction::LD_r8_r8(r8s1, r8s2) => {
+                // copy value at r82 to r81
+                let r82 = self.reg8_from_symbol(&r8s2);
+                let val = r82.0;
+                let r81 = self.reg8_from_symbol(&r8s1);
+                r81.0 = val;
+                4
+            }
+
+            Instruction::LD_r8_n8(r8s) => {
+                let val = self.fetch();
+                self.reg8_from_symbol(&r8s).0 = val;
+                8
+            }
+
+            Instruction::LD_r8_r16(r8s, r16s) => {
+                // get value pointed to by r16 and store in r8
+                let addr = self.reg16_from_symbol(&r16s).get() as usize;
+                let val = self.bus.read(addr as usize);
+                self.reg8_from_symbol(&r8s).0 = val;
+
+                if r16s == Reg16Symbol::HLI {
+                    self.inc_r16(r16s);
+                } else if r16s == Reg16Symbol::HLD {
+                    self.dec_r16(r16s);
+                }
+
+                8
             }
 
             Instruction::LD_r16_r8(r16s, r8s) => {
@@ -437,6 +468,36 @@ impl CPU<'_> {
                 8
             }
 
+            Instruction::LD_r16_n16(r16s) => {
+                let val = self.fetch_2();
+                let mut r16 = self.reg16_from_symbol(&r16s);
+                r16.set(val);
+                12
+            }
+
+            Instruction::LD_a16_SP => {
+                let addr = self.fetch_2();
+
+                // write SP & 0xFF (low byte) to addr, and SP >> 8 (high byte) to addr + 1
+                self.bus.write(addr as usize, (self.sp & 0xFF) as u8);
+                self.bus.write((addr + 1) as usize, (self.sp >> 8) as u8);
+                20
+            }
+
+            Instruction::LD_SP_n16 => {
+                let addr = self.fetch_2();
+                self.sp = addr;
+                12
+            }
+
+            Instruction::LD_HL_n8 => {
+                let value = self.fetch();
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL);
+                let address = hl.get() as usize;
+                self.bus.write(address, value);
+                12
+            }
+
             Instruction::INC_r16(r16s) => self.inc_r16(r16s),
 
             Instruction::INC_r8(r8s) => {
@@ -453,6 +514,13 @@ impl CPU<'_> {
                 self.reg8_from_symbol(&r8s).0 = r;
                 4
             }
+
+            Instruction::INC_SP => {
+                self.sp = self.sp.wrapping_add(1);
+                8
+            }
+
+            Instruction::DEC_r16(r16s) => self.dec_r16(r16s),
 
             Instruction::DEC_r8(r8s) => {
                 let r = self.reg8_from_symbol(&r8s).0;
@@ -473,32 +541,9 @@ impl CPU<'_> {
                 4
             }
 
-            Instruction::LD_r8_n8(r8s) => {
-                let val = self.fetch();
-                self.reg8_from_symbol(&r8s).0 = val;
+            Instruction::DEC_SP => {
+                self.sp = self.sp.wrapping_sub(1);
                 8
-            }
-
-            Instruction::RLCA => {
-                self.set_flag_z(false);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-
-                self.a.0 = self.a.0.rotate_left(1);
-
-                // set flag c to the leftmost bit that was rotated to the least significant
-                // position
-                self.set_flag_c(self.a.0 & 1 == 1);
-                4
-            }
-
-            Instruction::LD_a16_SP => {
-                let addr = self.fetch_2();
-
-                // write SP & 0xFF (low byte) to addr, and SP >> 8 (high byte) to addr + 1
-                self.bus.write(addr as usize, (self.sp & 0xFF) as u8);
-                self.bus.write((addr + 1) as usize, (self.sp >> 8) as u8);
-                20
             }
 
             Instruction::ADD_HL_r16(r16s) => {
@@ -513,22 +558,64 @@ impl CPU<'_> {
                 8
             }
 
-            Instruction::LD_r8_r16(r8s, r16s) => {
-                // get value pointed to by r16 and store in r8
-                let addr = self.reg16_from_symbol(&r16s).get() as usize;
-                let val = self.bus.read(addr as usize);
-                self.reg8_from_symbol(&r8s).0 = val;
+            Instruction::ADD_HL_SP => {
+                self.set_flag_n(false);
 
-                if r16s == Reg16Symbol::HLI {
-                    self.inc_r16(r16s);
-                } else if r16s == Reg16Symbol::HLD {
-                    self.dec_r16(r16s);
-                }
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
 
+                let res = self.sum_u16_with_flags(hl, self.sp);
+                self.reg16_from_symbol(&Reg16Symbol::HL).set(res);
                 8
             }
 
-            Instruction::DEC_r16(r16s) => self.dec_r16(r16s),
+            Instruction::ADD_A_r8(r8s) => {
+                let reg = self.reg8_from_symbol(&r8s);
+                let val = reg.0;
+
+                // overflow from bit 3
+                self.set_flag_h((self.a.0 & 0xF) as u16 + (val & 0xF) as u16 > 0xF);
+
+                // overflow from bit 7
+                let (res, c) = self.a.0.overflowing_add(val);
+                self.set_flag_c(c);
+
+                self.a.0 = res;
+
+                self.set_flag_z(res == 0);
+                self.set_flag_n(false);
+                4
+            }
+
+            Instruction::JR_n16 => {
+                let ofs = self.fetch() as i8;
+                let addr = self.fetch_2();
+                self.pc = addr.wrapping_add_signed(ofs.into()) + 2;
+                12
+            }
+
+            Instruction::JR_n16_Conditional(fls, on) => {
+                let ofs = self.fetch() as i8;
+                let flag = self.get_flag(&fls);
+                if flag == on {
+                    let addr = self.fetch_2();
+                    self.pc = addr.wrapping_add_signed(ofs.into()) + 2;
+                    12
+                } else {
+                    8
+                }
+            }
+            Instruction::RLCA => {
+                self.set_flag_z(false);
+                self.set_flag_n(false);
+                self.set_flag_h(false);
+
+                self.a.0 = self.a.0.rotate_left(1);
+
+                // set flag c to the leftmost bit that was rotated to the least significant
+                // position
+                self.set_flag_c(self.a.0 & 1 == 1);
+                4
+            }
 
             Instruction::RRCA => {
                 self.set_flag_z(false);
@@ -579,33 +666,6 @@ impl CPU<'_> {
                 4
             }
 
-            Instruction::JR_n16 => {
-                let ofs = self.fetch() as i8;
-                let addr = self.fetch_2();
-                self.pc = addr.wrapping_add_signed(ofs.into()) + 2;
-                12
-            }
-
-            Instruction::JR_n16_Conditional(fls, on) => {
-                let ofs = self.fetch() as i8;
-                let flag = self.get_flag(&fls);
-                if flag == on {
-                    let addr = self.fetch_2();
-                    self.pc = addr.wrapping_add_signed(ofs.into()) + 2;
-                    12
-                } else {
-                    8
-                }
-            }
-
-            Instruction::STOP => {
-                todo!();
-            }
-
-            Instruction::HALT => {
-                todo!();
-            }
-
             Instruction::DAA => {
                 let mut adj = 0;
                 self.set_flag_h(false);
@@ -648,45 +708,11 @@ impl CPU<'_> {
                 4
             }
 
-            Instruction::LD_SP_n16 => {
-                let addr = self.fetch_2();
-                self.sp = addr;
-                12
-            }
-
-            Instruction::INC_SP => {
-                self.sp = self.sp.wrapping_add(1);
-                8
-            }
-
-            Instruction::LD_HL_n8 => {
-                let value = self.fetch();
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL);
-                let address = hl.get() as usize;
-                self.bus.write(address, value);
-                12
-            }
-
             Instruction::SCF => {
                 self.set_flag_n(false);
                 self.set_flag_h(false);
                 self.set_flag_c(true);
                 4
-            }
-
-            Instruction::ADD_HL_SP => {
-                self.set_flag_n(false);
-
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
-
-                let res = self.sum_u16_with_flags(hl, self.sp);
-                self.reg16_from_symbol(&Reg16Symbol::HL).set(res);
-                8
-            }
-
-            Instruction::DEC_SP => {
-                self.sp = self.sp.wrapping_sub(1);
-                8
             }
 
             Instruction::CCF => {
@@ -696,31 +722,12 @@ impl CPU<'_> {
                 4
             }
 
-            Instruction::LD_r8_r8(r8s1, r8s2) => {
-                // copy value at r82 to r81
-                let r82 = self.reg8_from_symbol(&r8s2);
-                let val = r82.0;
-                let r81 = self.reg8_from_symbol(&r8s1);
-                r81.0 = val;
-                4
+            Instruction::STOP => {
+                todo!();
             }
 
-            Instruction::ADD_A_r8(r8s) => {
-                let reg = self.reg8_from_symbol(&r8s);
-                let val = reg.0;
-
-                // overflow from bit 3
-                self.set_flag_h((self.a.0 & 0xF) as u16 + (val & 0xF) as u16 > 0xF);
-
-                // overflow from bit 7
-                let (res, c) = self.a.0.overflowing_add(val);
-                self.set_flag_c(c);
-
-                self.a.0 = res;
-
-                self.set_flag_z(res == 0);
-                self.set_flag_n(false);
-                4
+            Instruction::HALT => {
+                todo!();
             }
 
             Instruction::NotImplemented => 4,

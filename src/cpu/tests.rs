@@ -160,10 +160,36 @@ fn test_ld_r8_r8_self() {
     ld_r8_r8(Reg8Symbol::A, Reg8Symbol::A, 1);
 }
 
+// LD_r8_n8
+#[test]
+fn test_ld_r8_n8() {
+    let mut rom = [0u8; 32 * 1024];
+    rom[0x100] = 0x06;
+    rom[0x101] = 41;
+
+    let mut cart = Cart::read_rom(&rom);
+    let mut bus = Bus::new(&mut cart);
+    let mut cpu = CPU::init(&mut bus);
+
+    cpu.step();
+
+    assert!(
+        cpu.b.0 == 41,
+        "Register does not have correct value, expected {}, got {}",
+        41,
+        cpu.b.0
+    );
+}
+
 // ADD_A_r8
 #[test]
 fn test_add_a_r8_no_carry() {
     add_a_r8(Reg8Symbol::B, 1, 1, 2, false, false, false, false);
+}
+
+#[test]
+fn test_add_a_r8_no_carry_zero() {
+    add_a_r8(Reg8Symbol::B, 0, 0, 0, true, false, false, false);
 }
 
 #[test]
@@ -184,9 +210,4 @@ fn test_add_a_r8_full_carry_zero() {
 #[test]
 fn test_add_a_r8_full_carry() {
     add_a_r8(Reg8Symbol::B, 10, 250, 4, false, false, true, true);
-}
-
-#[test]
-fn test_add_a_r8_no_carry_zero() {
-    add_a_r8(Reg8Symbol::B, 0, 0, 0, true, false, false, false);
 }

@@ -801,6 +801,54 @@ impl CPU<'_> {
                 8
             }
 
+            Instruction::OR_A_r8(r8s) => {
+                let reg = self.reg8_from_symbol(&r8s);
+                let val = reg.0;
+
+                self.a.0 = self.a.0 | val;
+
+                self.set_flag_z(self.a.0 == 0);
+                self.set_flag_n(false);
+                self.set_flag_h(false);
+                self.set_flag_c(false);
+                4
+            }
+
+            Instruction::OR_A_HL => {
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let val = self.bus.read(hl as usize);
+
+                self.a.0 = self.a.0 | val;
+
+                self.set_flag_z(self.a.0 == 0);
+                self.set_flag_n(false);
+                self.set_flag_h(false);
+                self.set_flag_c(false);
+                8
+            }
+
+            Instruction::CP_A_r8(r8s) => {
+                let reg = self.reg8_from_symbol(&r8s);
+                let val = reg.0;
+
+                let res = self.sub_u8_with_flags(self.a.0, val);
+
+                self.set_flag_z(res == 0);
+                self.set_flag_n(false);
+                4
+            }
+
+            Instruction::CP_A_HL => {
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let val = self.bus.read(hl as usize);
+
+                let res = self.sub_u8_with_flags(self.a.0, val);
+
+                self.set_flag_z(res == 0);
+                self.set_flag_n(false);
+                8
+            }
+
             Instruction::JR_n16 => {
                 let ofs = self.fetch() as i8;
                 let addr = self.fetch_2();

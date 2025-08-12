@@ -278,6 +278,18 @@ impl CPU<'_> {
         res
     }
 
+    fn sub_u8_with_flags(&mut self, n1: u8, n2: u8) -> u8 {
+        let res = n1.wrapping_sub(n2);
+
+        // borrow from bit 4
+        self.set_flag_h((n1 & 0x0F) < (n2 & 0x0F));
+
+        // full borrow
+        self.set_flag_c(n1 < n2);
+
+        res
+    }
+
     fn decode(&mut self, opcode: u8) -> Instruction {
         match opcode {
             0x00 => Instruction::NOP,
@@ -668,9 +680,26 @@ impl CPU<'_> {
             }
 
             Instruction::ADC_A_r8(r8s) => {
+                let carry = if self.get_flag_c() { 1 } else { 0 };
                 let reg = self.reg8_from_symbol(&r8s);
-                let val = reg.0;
+                let val = reg.0.wrapping_add(carry);
+
+                self.a.0 = self.sum_u8_with_flags(self.a.0, val);
+
+                self.set_flag_z(self.a.0 == 0);
+                self.set_flag_n(false);
                 4
+            }
+
+            Instruction::ADC_A_HL => {
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let val = self.bus.read(hl as usize);
+
+                self.a.0 = self.sum_u8_with_flags(self.a.0, val);
+
+                self.set_flag_z(self.a.0 == 0);
+                self.set_flag_n(false);
+                8
             }
 
             Instruction::JR_n16 => {

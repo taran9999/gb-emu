@@ -267,6 +267,17 @@ impl CPU<'_> {
         res
     }
 
+    fn sum_u8_with_flags(&mut self, n1: u8, n2: u8) -> u8 {
+        // overflow from bit 3
+        self.set_flag_h((n1 & 0xF) as u16 + (n2 & 0xF) as u16 > 0xF);
+
+        // overflow from bit 7
+        let (res, c) = n1.overflowing_add(n2);
+        self.set_flag_c(c);
+
+        res
+    }
+
     fn decode(&mut self, opcode: u8) -> Instruction {
         match opcode {
             0x00 => Instruction::NOP,
@@ -638,17 +649,27 @@ impl CPU<'_> {
                 let reg = self.reg8_from_symbol(&r8s);
                 let val = reg.0;
 
-                // overflow from bit 3
-                self.set_flag_h((self.a.0 & 0xF) as u16 + (val & 0xF) as u16 > 0xF);
+                self.a.0 = self.sum_u8_with_flags(self.a.0, val);
 
-                // overflow from bit 7
-                let (res, c) = self.a.0.overflowing_add(val);
-                self.set_flag_c(c);
-
-                self.a.0 = res;
-
-                self.set_flag_z(res == 0);
+                self.set_flag_z(self.a.0 == 0);
                 self.set_flag_n(false);
+                4
+            }
+
+            Instruction::ADD_A_HL => {
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let val = self.bus.read(hl as usize);
+
+                self.a.0 = self.sum_u8_with_flags(self.a.0, val);
+
+                self.set_flag_z(self.a.0 == 0);
+                self.set_flag_n(false);
+                8
+            }
+
+            Instruction::ADC_A_r8(r8s) => {
+                let reg = self.reg8_from_symbol(&r8s);
+                let val = reg.0;
                 4
             }
 

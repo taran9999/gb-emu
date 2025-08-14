@@ -1077,6 +1077,29 @@ impl CPU<'_> {
                 12
             }
 
+            Instruction::CALL_n16 => {
+                let addr = self.fetch_2();
+                self.stack_push_u16(addr);
+
+                let jump_addr = self.fetch_2();
+                self.pc = jump_addr;
+                24
+            }
+
+            Instruction::CALL_n16_Conditional(fls, on) => {
+                let flag = self.get_flag(&fls);
+                if flag != on {
+                    return 12;
+                }
+
+                let addr = self.fetch_2();
+                self.stack_push_u16(addr);
+
+                let jump_addr = self.fetch_2();
+                self.pc = jump_addr;
+                24
+            }
+
             Instruction::RLCA => {
                 self.set_flag_z(false);
                 self.set_flag_n(false);

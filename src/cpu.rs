@@ -70,30 +70,54 @@ enum Instruction {
     ADD_HL_SP,
     ADD_A_r8(Reg8Symbol),
     ADD_A_HL,
+    ADD_A_n8,
+    ADD_SP_e8,
 
     ADC_A_r8(Reg8Symbol),
     ADC_A_HL,
+    ADC_A_n8,
 
     SUB_A_r8(Reg8Symbol),
     SUB_A_HL,
+    SUB_A_n8,
 
     SBC_A_r8(Reg8Symbol),
     SBC_A_HL,
+    SBC_A_n8,
 
     AND_A_r8(Reg8Symbol),
     AND_A_HL,
+    AND_A_n8,
 
     XOR_A_r8(Reg8Symbol),
     XOR_A_HL,
+    XOR_A_n8,
 
     OR_A_r8(Reg8Symbol),
     OR_A_HL,
+    OR_A_n8,
 
     CP_A_r8(Reg8Symbol),
     CP_A_HL,
+    CP_A_n8,
+
+    JP_n16,
+    JP_n16_Conditional(FlagSymbol, bool),
 
     JR_n16,
     JR_n16_Conditional(FlagSymbol, bool),
+
+    // conditional, if yes then check flag symbol with bool
+    RET(bool, FlagSymbol, bool),
+    RETI,
+
+    // split the r16 into the high and low parts to make implementation simpler
+    PUSH_r16(Reg8Symbol, Reg8Symbol),
+    POP_r16(Reg8Symbol, Reg8Symbol),
+    POP_AF,
+
+    CALL_n16,
+    CALL_n16_Conditional(FlagSymbol, bool),
 
     RLCA,
     RRCA,
@@ -103,6 +127,8 @@ enum Instruction {
     CPL,
     SCF,
     CCF,
+    DI,
+    EI,
     STOP,
     HALT,
 
@@ -679,6 +705,32 @@ impl CPU<'_> {
                 8
             }
 
+            Instruction::ADD_A_n8 => {
+                let val = self.fetch();
+                self.a.0 = self.sum_u8_with_flags(self.a.0, val);
+
+                self.set_flag_z(self.a.0 == 0);
+                self.set_flag_n(false);
+                8
+            }
+
+            Instruction::ADD_SP_e8 => {
+                let ofs = self.fetch();
+                let ofs_signed = ofs as i8;
+                let ofs_u16 = ofs_signed as u16;
+
+                // set h and c flags as u8 addition
+                let sp_low = (self.sp & 0xFF) as u8;
+                self.set_flag_h((sp_low & 0x0F) + (ofs & 0x0F) > 0x0F);
+                self.set_flag_c((sp_low as u16) + (ofs as u16) > 0xFF);
+
+                self.sp = self.sp.wrapping_add(ofs_u16);
+
+                self.set_flag_z(self.sp == 0);
+                self.set_flag_n(false);
+                16
+            }
+
             Instruction::ADC_A_r8(r8s) => {
                 let carry = if self.get_flag_c() { 1 } else { 0 };
                 let reg = self.reg8_from_symbol(&r8s);
@@ -694,6 +746,17 @@ impl CPU<'_> {
             Instruction::ADC_A_HL => {
                 let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
                 let val = self.bus.read(hl as usize);
+
+                self.a.0 = self.sum_u8_with_flags(self.a.0, val);
+
+                self.set_flag_z(self.a.0 == 0);
+                self.set_flag_n(false);
+                8
+            }
+
+            Instruction::ADC_A_n8 => {
+                let carry = if self.get_flag_c() { 1 } else { 0 };
+                let val = self.fetch();
 
                 self.a.0 = self.sum_u8_with_flags(self.a.0, val);
 
@@ -724,6 +787,16 @@ impl CPU<'_> {
                 8
             }
 
+            Instruction::SUB_A_n8 => {
+                let val = self.fetch();
+
+                self.a.0 = self.sub_u8_with_flags(self.a.0, val);
+
+                self.set_flag_z(self.a.0 == 0);
+                self.set_flag_n(false);
+                8
+            }
+
             Instruction::SBC_A_r8(r8s) => {
                 let carry = if self.get_flag_c() { 1 } else { 0 };
                 let reg = self.reg8_from_symbol(&r8s);
@@ -745,7 +818,17 @@ impl CPU<'_> {
 
                 self.set_flag_z(self.a.0 == 0);
                 self.set_flag_n(false);
+                8
+            }
 
+            Instruction::SBC_A_n8 => {
+                let carry = if self.get_flag_c() { 1 } else { 0 };
+                let val = self.fetch();
+
+                self.a.0 = self.sub_u8_with_flags(self.a.0, val);
+
+                self.set_flag_z(self.a.0 == 0);
+                self.set_flag_n(false);
                 8
             }
 
@@ -765,6 +848,18 @@ impl CPU<'_> {
             Instruction::AND_A_HL => {
                 let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
                 let val = self.bus.read(hl as usize);
+
+                self.a.0 = self.a.0 & val;
+
+                self.set_flag_z(self.a.0 == 0);
+                self.set_flag_n(false);
+                self.set_flag_h(true);
+                self.set_flag_c(false);
+                8
+            }
+
+            Instruction::AND_A_n8 => {
+                let val = self.fetch();
 
                 self.a.0 = self.a.0 & val;
 
@@ -801,6 +896,18 @@ impl CPU<'_> {
                 8
             }
 
+            Instruction::XOR_A_n8 => {
+                let val = self.fetch();
+
+                self.a.0 = self.a.0 ^ val;
+
+                self.set_flag_z(self.a.0 == 0);
+                self.set_flag_n(false);
+                self.set_flag_h(false);
+                self.set_flag_c(false);
+                8
+            }
+
             Instruction::OR_A_r8(r8s) => {
                 let reg = self.reg8_from_symbol(&r8s);
                 let val = reg.0;
@@ -817,6 +924,18 @@ impl CPU<'_> {
             Instruction::OR_A_HL => {
                 let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
                 let val = self.bus.read(hl as usize);
+
+                self.a.0 = self.a.0 | val;
+
+                self.set_flag_z(self.a.0 == 0);
+                self.set_flag_n(false);
+                self.set_flag_h(false);
+                self.set_flag_c(false);
+                8
+            }
+
+            Instruction::OR_A_n8 => {
+                let val = self.fetch();
 
                 self.a.0 = self.a.0 | val;
 
@@ -849,6 +968,33 @@ impl CPU<'_> {
                 8
             }
 
+            Instruction::CP_A_n8 => {
+                let val = self.fetch();
+
+                let res = self.sub_u8_with_flags(self.a.0, val);
+
+                self.set_flag_z(res == 0);
+                self.set_flag_n(false);
+                8
+            }
+
+            Instruction::JP_n16 => {
+                let addr = self.fetch_2();
+                self.pc = addr;
+                16
+            }
+
+            Instruction::JP_n16_Conditional(fls, on) => {
+                let flag = self.get_flag(&fls);
+                if flag == on {
+                    let addr = self.fetch_2();
+                    self.pc = addr;
+                    16
+                } else {
+                    12
+                }
+            }
+
             Instruction::JR_n16 => {
                 let ofs = self.fetch() as i8;
                 let addr = self.fetch_2();
@@ -867,6 +1013,67 @@ impl CPU<'_> {
                     8
                 }
             }
+
+            Instruction::RET(cond, fls, on) => {
+                let mut action = !cond;
+                if cond {
+                    let flag = self.get_flag(&fls);
+                    action = flag == on;
+                }
+
+                if action {
+                    let low = self.bus.read(self.sp as usize);
+                    self.sp = self.sp.wrapping_add(1);
+                    let high = self.bus.read(self.sp as usize);
+                    self.sp = self.sp.wrapping_add(1);
+
+                    self.pc = (high as u16) << 8 | low as u16;
+                }
+
+                if cond {
+                    if action {
+                        20
+                    } else {
+                        8
+                    }
+                } else {
+                    16
+                }
+            }
+
+            Instruction::PUSH_r16(high, low) => {
+                self.sp = self.sp.wrapping_sub(1);
+                let high_val = self.reg8_from_symbol(&high).0;
+                self.bus.write(self.sp as usize, high_val);
+
+                self.sp.wrapping_sub(1);
+                let low_val = self.reg8_from_symbol(&low).0;
+                self.bus.write(self.sp as usize, low_val);
+                16
+            }
+
+            Instruction::POP_r16(high, low) => {
+                let low_val = self.bus.read(self.sp as usize);
+                self.sp = self.sp.wrapping_add(1);
+                let low_reg = self.reg8_from_symbol(&low);
+                low_reg.0 = low_val;
+
+                let high_val = self.bus.read(self.sp as usize);
+                self.sp = self.sp.wrapping_add(1);
+                let high_reg = self.reg8_from_symbol(&high);
+                high_reg.0 = high_val;
+                12
+            }
+
+            Instruction::POP_AF => {
+                self.f.0 = self.bus.read(self.sp as usize) & 0xF0;
+                self.sp = self.sp.wrapping_add(1);
+
+                self.a.0 = self.bus.read(self.sp as usize);
+                self.sp = self.sp.wrapping_add(1);
+                12
+            }
+
             Instruction::RLCA => {
                 self.set_flag_z(false);
                 self.set_flag_n(false);
@@ -994,8 +1201,6 @@ impl CPU<'_> {
             }
 
             Instruction::NotImplemented => 4,
-
-            _ => todo!(), // temporary, just to compile for testing
         }
     }
 

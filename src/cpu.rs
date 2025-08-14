@@ -111,9 +111,8 @@ enum Instruction {
     RET(bool, FlagSymbol, bool),
     RETI,
 
-    // split the r16 into the high and low parts to make implementation simpler
-    PUSH_r16(Reg8Symbol, Reg8Symbol),
-    POP_r16(Reg8Symbol, Reg8Symbol),
+    PUSH_r16(Reg16Symbol),
+    POP_r16(Reg16Symbol),
     POP_AF,
 
     CALL_n16,
@@ -316,15 +315,28 @@ impl CPU<'_> {
         res
     }
 
-    fn stack_push(&mut self, val: u8) {
+    fn stack_push_u8(&mut self, val: u8) {
         self.sp = self.sp.wrapping_sub(1);
         self.bus.write(self.sp as usize, val);
     }
 
-    fn stack_pop(&mut self) -> u8 {
+    fn stack_push_u16(&mut self, val: u16) {
+        let low = val as u8;
+        let high = (val >> 8) as u8;
+        self.stack_push_u8(high);
+        self.stack_push_u8(low);
+    }
+
+    fn stack_pop_u8(&mut self) -> u8 {
         let val = self.bus.read(self.sp as usize);
         self.sp = self.sp.wrapping_add(1);
         val
+    }
+
+    fn stack_pop_u16(&mut self) -> u16 {
+        let low = self.stack_pop_u8();
+        let high = self.stack_pop_u8();
+        (high as u16) << 8 | low as u16
     }
 
     fn decode(&mut self, opcode: u8) -> Instruction {
@@ -1033,8 +1045,8 @@ impl CPU<'_> {
                 }
 
                 if action {
-                    let low = self.stack_pop();
-                    let high = self.stack_pop();
+                    let low = self.stack_pop_u8();
+                    let high = self.stack_pop_u8();
 
                     self.pc = (high as u16) << 8 | low as u16;
                 }
@@ -1050,31 +1062,25 @@ impl CPU<'_> {
                 }
             }
 
-            Instruction::PUSH_r16(high, low) => {
-                let high_val = self.reg8_from_symbol(&high).0;
-                self.stack_push(high_val);
-
-                let low_val = self.reg8_from_symbol(&low).0;
-                self.stack_push(low_val);
+            Instruction::PUSH_r16(r16s) => {
+                let reg = self.reg16_from_symbol(&r16s);
+                let val = reg.get();
+                self.stack_push_u16(val);
                 16
             }
 
-            Instruction::POP_r16(high, low) => {
-                let low_val = self.stack_pop();
-                let low_reg = self.reg8_from_symbol(&low);
-                low_reg.0 = low_val;
-
-                let high_val = self.stack_pop();
-                let high_reg = self.reg8_from_symbol(&high);
-                high_reg.0 = high_val;
+            Instruction::POP_r16(r16s) => {
+                let val = self.stack_pop_u16();
+                let mut reg = self.reg16_from_symbol(&r16s);
+                reg.set(val);
                 12
             }
 
             Instruction::POP_AF => {
-                let f_new = self.stack_pop() & 0xF0;
+                let f_new = self.stack_pop_u8() & 0xF0;
                 self.f.0 = f_new;
 
-                let a_new = self.stack_pop();
+                let a_new = self.stack_pop_u8();
                 self.a.0 = a_new;
                 12
             }

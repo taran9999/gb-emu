@@ -316,6 +316,17 @@ impl CPU<'_> {
         res
     }
 
+    fn stack_push(&mut self, val: u8) {
+        self.sp = self.sp.wrapping_sub(1);
+        self.bus.write(self.sp as usize, val);
+    }
+
+    fn stack_pop(&mut self) -> u8 {
+        let val = self.bus.read(self.sp as usize);
+        self.sp = self.sp.wrapping_add(1);
+        val
+    }
+
     fn decode(&mut self, opcode: u8) -> Instruction {
         match opcode {
             0x00 => Instruction::NOP,
@@ -1022,10 +1033,8 @@ impl CPU<'_> {
                 }
 
                 if action {
-                    let low = self.bus.read(self.sp as usize);
-                    self.sp = self.sp.wrapping_add(1);
-                    let high = self.bus.read(self.sp as usize);
-                    self.sp = self.sp.wrapping_add(1);
+                    let low = self.stack_pop();
+                    let high = self.stack_pop();
 
                     self.pc = (high as u16) << 8 | low as u16;
                 }
@@ -1042,35 +1051,31 @@ impl CPU<'_> {
             }
 
             Instruction::PUSH_r16(high, low) => {
-                self.sp = self.sp.wrapping_sub(1);
                 let high_val = self.reg8_from_symbol(&high).0;
-                self.bus.write(self.sp as usize, high_val);
+                self.stack_push(high_val);
 
-                self.sp.wrapping_sub(1);
                 let low_val = self.reg8_from_symbol(&low).0;
-                self.bus.write(self.sp as usize, low_val);
+                self.stack_push(low_val);
                 16
             }
 
             Instruction::POP_r16(high, low) => {
-                let low_val = self.bus.read(self.sp as usize);
-                self.sp = self.sp.wrapping_add(1);
+                let low_val = self.stack_pop();
                 let low_reg = self.reg8_from_symbol(&low);
                 low_reg.0 = low_val;
 
-                let high_val = self.bus.read(self.sp as usize);
-                self.sp = self.sp.wrapping_add(1);
+                let high_val = self.stack_pop();
                 let high_reg = self.reg8_from_symbol(&high);
                 high_reg.0 = high_val;
                 12
             }
 
             Instruction::POP_AF => {
-                self.f.0 = self.bus.read(self.sp as usize) & 0xF0;
-                self.sp = self.sp.wrapping_add(1);
+                let f_new = self.stack_pop() & 0xF0;
+                self.f.0 = f_new;
 
-                self.a.0 = self.bus.read(self.sp as usize);
-                self.sp = self.sp.wrapping_add(1);
+                let a_new = self.stack_pop();
+                self.a.0 = a_new;
                 12
             }
 

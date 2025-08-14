@@ -107,8 +107,8 @@ enum Instruction {
     JR_n16,
     JR_n16_Conditional(FlagSymbol, bool),
 
-    // conditional, if yes then check flag symbol with bool
-    RET(bool, FlagSymbol, bool),
+    RET,
+    RET_Conditional(FlagSymbol, bool),
     RETI,
 
     PUSH_r16(Reg16Symbol),
@@ -1037,29 +1037,21 @@ impl CPU<'_> {
                 }
             }
 
-            Instruction::RET(cond, fls, on) => {
-                let mut action = !cond;
-                if cond {
-                    let flag = self.get_flag(&fls);
-                    action = flag == on;
+            Instruction::RET => {
+                let val = self.stack_pop_u16();
+                self.pc = val;
+                16
+            }
+
+            Instruction::RET_Conditional(fls, on) => {
+                let flag = self.get_flag(&fls);
+                if flag != on {
+                    return 8;
                 }
 
-                if action {
-                    let low = self.stack_pop_u8();
-                    let high = self.stack_pop_u8();
-
-                    self.pc = (high as u16) << 8 | low as u16;
-                }
-
-                if cond {
-                    if action {
-                        20
-                    } else {
-                        8
-                    }
-                } else {
-                    16
-                }
+                let val = self.stack_pop_u16();
+                self.pc = val;
+                20
             }
 
             Instruction::PUSH_r16(r16s) => {

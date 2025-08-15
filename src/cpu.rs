@@ -131,6 +131,28 @@ enum Instruction {
     STOP,
     HALT,
 
+    PREFIX,
+    RLC(Reg8Symbol),
+    RLC_HL,
+    RL(Reg8Symbol),
+    RL_HL,
+    RRC(Reg8Symbol),
+    RRC_HL,
+    RR(Reg8Symbol),
+    RR_HL,
+    SLA(Reg8Symbol),
+    SLA_HL,
+    SRA(Reg8Symbol),
+    SRA_HL,
+
+    // use u8 as u3 - values should range from 0 to 7
+    BIT(u8, Reg8Symbol),
+    BIT_HL(u8),
+    RES(u8, Reg8Symbol),
+    RES_HL(u8),
+    SET(u8, Reg8Symbol),
+    SET_HL(u8),
+
     NotImplemented,
 }
 

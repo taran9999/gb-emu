@@ -361,6 +361,70 @@ impl CPU<'_> {
         (high as u16) << 8 | low as u16
     }
 
+    fn u8_rot_left(&mut self, val: u8) -> u8 {
+        self.set_flag_z(false);
+        self.set_flag_n(false);
+        self.set_flag_h(false);
+
+        let res = val.rotate_left(1);
+
+        // set flag c to the leftmost bit that was rotated to the least significant
+        // position
+        self.set_flag_c(val & 1 == 1);
+
+        res
+    }
+
+    fn u8_rot_left_through_carry(&mut self, val: u8) -> u8 {
+        self.set_flag_z(false);
+        self.set_flag_n(false);
+        self.set_flag_h(false);
+
+        // shift left, then set the last bit to current value of c flag, and set c flag to
+        // the shifted out bit
+        let left_bit = val & 0b1000_0000 == 0b1000_0000;
+        let mut res = val << 1;
+
+        if self.get_flag_c() {
+            res |= 0b0000_0001;
+        } else {
+            res &= 0b1111_1110;
+        }
+
+        self.set_flag_c(left_bit);
+
+        res
+    }
+
+    fn u8_rot_right_through_carry(&mut self, val: u8) -> u8 {
+        self.set_flag_z(false);
+        self.set_flag_n(false);
+        self.set_flag_h(false);
+
+        let right_bit = val & 0b0000_0001 == 0b0000_0001;
+        let mut res = val >> 1;
+
+        if self.get_flag_c() {
+            res |= 0b1000_0000;
+        } else {
+            res &= 0b0111_1111;
+        }
+
+        self.set_flag_c(right_bit);
+
+        res
+    }
+
+    fn u8_rot_right(&mut self, val: u8) -> u8 {
+        self.set_flag_z(false);
+        self.set_flag_n(false);
+        self.set_flag_h(false);
+
+        self.set_flag_c(val & 1 == 1);
+
+        val.rotate_right(1)
+    }
+
     fn decode(&mut self, opcode: u8) -> Instruction {
         match opcode {
             0x00 => Instruction::NOP,
@@ -1123,64 +1187,26 @@ impl CPU<'_> {
             }
 
             Instruction::RLCA => {
-                self.set_flag_z(false);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-
-                self.a.0 = self.a.0.rotate_left(1);
-
-                // set flag c to the leftmost bit that was rotated to the least significant
-                // position
-                self.set_flag_c(self.a.0 & 1 == 1);
+                let val = self.a.0;
+                self.a.0 = self.u8_rot_left(val);
                 4
             }
 
             Instruction::RRCA => {
-                self.set_flag_z(false);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-
-                self.set_flag_c(self.a.0 & 1 == 1);
-
-                self.a.0 = self.a.0.rotate_right(1);
+                let val = self.a.0;
+                self.a.0 = self.u8_rot_right(val);
                 4
             }
 
             Instruction::RLA => {
-                self.set_flag_z(false);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-
-                // shift left, then set the last bit to current value of c flag, and set c flag to
-                // the shifted out bit
-                let left_bit = self.a.0 & 0b1000_0000 == 0b1000_0000;
-                self.a.0 = self.a.0 << 1;
-
-                if self.get_flag_c() {
-                    self.a.0 |= 0b0000_0001;
-                } else {
-                    self.a.0 &= 0b1111_1110;
-                }
-
-                self.set_flag_c(left_bit);
+                let val = self.a.0;
+                self.a.0 = self.u8_rot_left_through_carry(val);
                 4
             }
 
             Instruction::RRA => {
-                self.set_flag_z(false);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-
-                let right_bit = self.a.0 & 0b0000_0001 == 0b0000_0001;
-                self.a.0 = self.a.0 >> 1;
-
-                if self.get_flag_c() {
-                    self.a.0 |= 0b1000_0000;
-                } else {
-                    self.a.0 &= 0b0111_1111;
-                }
-
-                self.set_flag_c(right_bit);
+                let val = self.a.0;
+                self.a.0 = self.u8_rot_right_through_carry(val);
                 4
             }
 
@@ -1247,6 +1273,8 @@ impl CPU<'_> {
             Instruction::HALT => {
                 todo!();
             }
+
+            Instruction::RLC(r8s) => {}
 
             Instruction::NotImplemented => 4,
         }

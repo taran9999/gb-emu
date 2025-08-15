@@ -140,6 +140,7 @@ enum Instruction {
     RRC_HL,
     RR(Reg8Symbol),
     RR_HL,
+
     SLA(Reg8Symbol),
     SLA_HL,
     SRA(Reg8Symbol),
@@ -1274,7 +1275,77 @@ impl CPU<'_> {
                 todo!();
             }
 
-            Instruction::RLC(r8s) => {}
+            Instruction::RLC(r8s) => {
+                let reg = self.reg8_from_symbol(&r8s);
+                let val = reg.0;
+                let new = self.u8_rot_left(val);
+                reg.0 = new;
+                self.set_flag_z(new == 0);
+                8
+            }
+
+            Instruction::RLC_HL => {
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let val = self.bus.read(hl as usize);
+                let new = self.u8_rot_left(val);
+                self.bus.write(hl as usize, new);
+                self.set_flag_z(new == 0);
+                16
+            }
+
+            Instruction::RL(r8s) => {
+                let reg = self.reg8_from_symbol(&r8s);
+                let val = reg.0;
+                let new = self.u8_rot_left_through_carry(val);
+                reg.0 = new;
+                self.set_flag_z(new == 0);
+                8
+            }
+
+            Instruction::RL_HL => {
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let val = self.bus.read(hl as usize);
+                let new = self.u8_rot_left_through_carry(val);
+                self.bus.write(hl as usize, new);
+                self.set_flag_z(new == 0);
+                16
+            }
+
+            Instruction::RRC(r8s) => {
+                let reg = self.reg8_from_symbol(&r8s);
+                let val = reg.0;
+                let new = self.u8_rot_right(val);
+                reg.0 = new;
+                self.set_flag_z(new == 0);
+                8
+            }
+
+            Instruction::RRC_HL => {
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let val = self.bus.read(hl as usize);
+                let new = self.u8_rot_right(val);
+                self.bus.write(hl as usize, new);
+                self.set_flag_z(new == 0);
+                16
+            }
+
+            Instruction::RR(r8s) => {
+                let reg = self.reg8_from_symbol(&r8s);
+                let val = reg.0;
+                let new = self.u8_rot_right_through_carry(val);
+                reg.0 = new;
+                self.set_flag_z(new == 0);
+                8
+            }
+
+            Instruction::RR_HL => {
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let val = self.bus.read(hl as usize);
+                let new = self.u8_rot_right_through_carry(val);
+                self.bus.write(hl as usize, new);
+                self.set_flag_z(new == 0);
+                16
+            }
 
             Instruction::NotImplemented => 4,
         }

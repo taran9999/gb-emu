@@ -1165,8 +1165,8 @@ impl CPU<'_> {
             }
 
             Instruction::CALL_n16 => {
-                let addr = self.fetch_2();
-                self.stack_push_u16(addr);
+                let ret_addr = self.pc + 3;
+                self.stack_push_u16(ret_addr);
 
                 let jump_addr = self.fetch_2();
                 self.pc = jump_addr;
@@ -1179,8 +1179,8 @@ impl CPU<'_> {
                     return 12;
                 }
 
-                let addr = self.fetch_2();
-                self.stack_push_u16(addr);
+                let ret_addr = self.pc + 3;
+                self.stack_push_u16(ret_addr);
 
                 let jump_addr = self.fetch_2();
                 self.pc = jump_addr;

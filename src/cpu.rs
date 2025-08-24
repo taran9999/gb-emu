@@ -117,6 +117,7 @@ enum Instruction {
 
     CALL_n16,
     CALL_n16_Conditional(FlagSymbol, bool),
+    RST(u16),
 
     RLCA,
     RRCA,
@@ -1185,6 +1186,13 @@ impl CPU<'_> {
                 let jump_addr = self.fetch_2();
                 self.pc = jump_addr;
                 24
+            }
+
+            Instruction::RST(addr) => {
+                let ret_addr = self.pc;
+                self.stack_push_u16(ret_addr);
+                self.pc = addr;
+                16
             }
 
             Instruction::RLCA => {

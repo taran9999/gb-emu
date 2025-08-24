@@ -1347,6 +1347,94 @@ impl CPU<'_> {
                 16
             }
 
+            Instruction::SLA(r8s) => {
+                let reg = self.reg8_from_symbol(&r8s);
+                self.set_flag_c(reg.0 & 0b1000_0000 == 1);
+                reg.0 = reg.0 << 1;
+                self.set_flag_z(reg.0 == 0);
+                self.set_flag_n(false);
+                self.set_flag_h(false);
+                8
+            }
+
+            Instruction::SLA_HL => {
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let val = self.bus.read(hl as usize);
+                self.set_flag_c(val & 0b1000_0000 == 1);
+                let new = val << 1;
+                self.bus.write(hl as usize, new);
+                self.set_flag_z(new == 0);
+                self.set_flag_n(false);
+                self.set_flag_h(false);
+                16
+            }
+
+            Instruction::SRA(r8s) => {
+                let reg = self.reg8_from_symbol(&r8s);
+                self.set_flag_c(reg.0 & 1 == 1);
+                reg.0 = reg.0 >> 1;
+                self.set_flag_z(reg.0 == 0);
+                self.set_flag_n(false);
+                self.set_flag_h(false);
+                8
+            }
+
+            Instruction::SRA_HL => {
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let val = self.bus.read(hl as usize);
+                self.set_flag_c(val & 1 == 1);
+                let new = val >> 1;
+                self.bus.write(hl as usize, new);
+                self.set_flag_z(new == 0);
+                self.set_flag_n(false);
+                self.set_flag_h(false);
+                16
+            }
+
+            Instruction::BIT(n, r8s) => {
+                let reg = self.reg8_from_symbol(&r8s);
+                let val = reg.0 >> n;
+                self.set_flag_z(val & 1 == 0);
+                self.set_flag_n(false);
+                self.set_flag_h(true);
+                8
+            }
+
+            Instruction::BIT_HL(n) => {
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let val = self.bus.read(hl as usize) >> n;
+                self.set_flag_c(val & 1 == 0);
+                self.set_flag_n(false);
+                self.set_flag_h(true);
+                16
+            }
+
+            Instruction::RES(n, r8s) => {
+                let reg = self.reg8_from_symbol(&r8s);
+                reg.0 = reg.0 & !(1 << n);
+                8
+            }
+
+            Instruction::RES_HL(n) => {
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let val = self.bus.read(hl as usize) & !(1 << n);
+                self.bus.write(hl as usize, val);
+                16
+            }
+
+            Instruction::SET(n, r8s) => {
+                let reg = self.reg8_from_symbol(&r8s);
+                reg.0 = reg.0 | (1 << n);
+                8
+            }
+
+            Instruction::SET_HL(n) => {
+                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let val = self.bus.read(hl as usize) | (1 << n);
+                self.bus.write(hl as usize, val);
+                16
+            }
+
             Instruction::NotImplemented => 4,
         }
     }

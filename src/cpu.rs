@@ -147,6 +147,12 @@ enum Instruction {
     SRA(Reg8Symbol),
     SRA_HL,
 
+    SWAP(Reg8Symbol),
+    SWAP_HL,
+
+    SRL(Reg8Symbol),
+    SRL_HL,
+
     // use u8 as u3 - values should range from 0 to 7
     BIT(u8, Reg8Symbol),
     BIT_HL(u8),
@@ -637,6 +643,298 @@ impl CPU<'_> {
                 println!("Warning: no implementation for opcode {:X}", opcode);
                 Instruction::NotImplemented
             }
+        }
+    }
+
+    fn decode_prefix(&self, opcode: u8) -> Instruction {
+        match opcode {
+            0x00 => Instruction::RLC(Reg8Symbol::B),
+            0x01 => Instruction::RLC(Reg8Symbol::C),
+            0x02 => Instruction::RLC(Reg8Symbol::D),
+            0x03 => Instruction::RLC(Reg8Symbol::E),
+            0x04 => Instruction::RLC(Reg8Symbol::H),
+            0x05 => Instruction::RLC(Reg8Symbol::L),
+            0x06 => Instruction::RLC_HL,
+            0x07 => Instruction::RLC(Reg8Symbol::A),
+
+            0x08 => Instruction::RRC(Reg8Symbol::B),
+            0x09 => Instruction::RRC(Reg8Symbol::C),
+            0x0A => Instruction::RRC(Reg8Symbol::D),
+            0x0B => Instruction::RRC(Reg8Symbol::E),
+            0x0C => Instruction::RRC(Reg8Symbol::H),
+            0x0D => Instruction::RRC(Reg8Symbol::L),
+            0x0E => Instruction::RRC_HL,
+            0x0F => Instruction::RRC(Reg8Symbol::A),
+
+            0x10 => Instruction::RL(Reg8Symbol::B),
+            0x11 => Instruction::RL(Reg8Symbol::C),
+            0x12 => Instruction::RL(Reg8Symbol::D),
+            0x13 => Instruction::RL(Reg8Symbol::E),
+            0x14 => Instruction::RL(Reg8Symbol::H),
+            0x15 => Instruction::RL(Reg8Symbol::L),
+            0x16 => Instruction::RL_HL,
+            0x17 => Instruction::RL(Reg8Symbol::A),
+
+            0x18 => Instruction::RR(Reg8Symbol::B),
+            0x19 => Instruction::RR(Reg8Symbol::C),
+            0x1A => Instruction::RR(Reg8Symbol::D),
+            0x1B => Instruction::RR(Reg8Symbol::E),
+            0x1C => Instruction::RR(Reg8Symbol::H),
+            0x1D => Instruction::RR(Reg8Symbol::L),
+            0x1E => Instruction::RR_HL,
+            0x1F => Instruction::RR(Reg8Symbol::A),
+
+            0x20 => Instruction::SLA(Reg8Symbol::B),
+            0x21 => Instruction::SLA(Reg8Symbol::C),
+            0x22 => Instruction::SLA(Reg8Symbol::D),
+            0x23 => Instruction::SLA(Reg8Symbol::E),
+            0x24 => Instruction::SLA(Reg8Symbol::H),
+            0x25 => Instruction::SLA(Reg8Symbol::L),
+            0x26 => Instruction::SLA_HL,
+            0x27 => Instruction::SLA(Reg8Symbol::A),
+
+            0x28 => Instruction::SRA(Reg8Symbol::B),
+            0x29 => Instruction::SRA(Reg8Symbol::C),
+            0x2A => Instruction::SRA(Reg8Symbol::D),
+            0x2B => Instruction::SRA(Reg8Symbol::E),
+            0x2C => Instruction::SRA(Reg8Symbol::H),
+            0x2D => Instruction::SRA(Reg8Symbol::L),
+            0x2E => Instruction::SRA_HL,
+            0x2F => Instruction::SRA(Reg8Symbol::A),
+
+            0x30 => Instruction::SWAP(Reg8Symbol::B),
+            0x31 => Instruction::SWAP(Reg8Symbol::C),
+            0x32 => Instruction::SWAP(Reg8Symbol::D),
+            0x33 => Instruction::SWAP(Reg8Symbol::E),
+            0x34 => Instruction::SWAP(Reg8Symbol::H),
+            0x35 => Instruction::SWAP(Reg8Symbol::L),
+            0x36 => Instruction::SWAP_HL,
+            0x37 => Instruction::SWAP(Reg8Symbol::A),
+
+            0x38 => Instruction::SRL(Reg8Symbol::B),
+            0x39 => Instruction::SRL(Reg8Symbol::C),
+            0x3A => Instruction::SRL(Reg8Symbol::D),
+            0x3B => Instruction::SRL(Reg8Symbol::E),
+            0x3C => Instruction::SRL(Reg8Symbol::H),
+            0x3D => Instruction::SRL(Reg8Symbol::L),
+            0x3E => Instruction::SRL_HL,
+            0x3F => Instruction::SRL(Reg8Symbol::A),
+
+            0x40 => Instruction::BIT(0, Reg8Symbol::B),
+            0x41 => Instruction::BIT(0, Reg8Symbol::C),
+            0x42 => Instruction::BIT(0, Reg8Symbol::D),
+            0x43 => Instruction::BIT(0, Reg8Symbol::E),
+            0x44 => Instruction::BIT(0, Reg8Symbol::H),
+            0x45 => Instruction::BIT(0, Reg8Symbol::L),
+            0x46 => Instruction::BIT_HL(0),
+            0x47 => Instruction::BIT(0, Reg8Symbol::A),
+
+            0x48 => Instruction::BIT(1, Reg8Symbol::B),
+            0x49 => Instruction::BIT(1, Reg8Symbol::C),
+            0x4A => Instruction::BIT(1, Reg8Symbol::D),
+            0x4B => Instruction::BIT(1, Reg8Symbol::E),
+            0x4C => Instruction::BIT(1, Reg8Symbol::H),
+            0x4D => Instruction::BIT(1, Reg8Symbol::L),
+            0x4E => Instruction::BIT_HL(1),
+            0x4F => Instruction::BIT(1, Reg8Symbol::A),
+
+            0x50 => Instruction::BIT(2, Reg8Symbol::B),
+            0x51 => Instruction::BIT(2, Reg8Symbol::C),
+            0x52 => Instruction::BIT(2, Reg8Symbol::D),
+            0x53 => Instruction::BIT(2, Reg8Symbol::E),
+            0x54 => Instruction::BIT(2, Reg8Symbol::H),
+            0x55 => Instruction::BIT(2, Reg8Symbol::L),
+            0x56 => Instruction::BIT_HL(2),
+            0x57 => Instruction::BIT(2, Reg8Symbol::A),
+
+            0x58 => Instruction::BIT(3, Reg8Symbol::B),
+            0x59 => Instruction::BIT(3, Reg8Symbol::C),
+            0x5A => Instruction::BIT(3, Reg8Symbol::D),
+            0x5B => Instruction::BIT(3, Reg8Symbol::E),
+            0x5C => Instruction::BIT(3, Reg8Symbol::H),
+            0x5D => Instruction::BIT(3, Reg8Symbol::L),
+            0x5E => Instruction::BIT_HL(3),
+            0x5F => Instruction::BIT(3, Reg8Symbol::A),
+
+            0x60 => Instruction::BIT(4, Reg8Symbol::B),
+            0x61 => Instruction::BIT(4, Reg8Symbol::C),
+            0x62 => Instruction::BIT(4, Reg8Symbol::D),
+            0x63 => Instruction::BIT(4, Reg8Symbol::E),
+            0x64 => Instruction::BIT(4, Reg8Symbol::H),
+            0x65 => Instruction::BIT(4, Reg8Symbol::L),
+            0x66 => Instruction::BIT_HL(4),
+            0x67 => Instruction::BIT(4, Reg8Symbol::A),
+
+            0x68 => Instruction::BIT(5, Reg8Symbol::B),
+            0x69 => Instruction::BIT(5, Reg8Symbol::C),
+            0x6A => Instruction::BIT(5, Reg8Symbol::D),
+            0x6B => Instruction::BIT(5, Reg8Symbol::E),
+            0x6C => Instruction::BIT(5, Reg8Symbol::H),
+            0x6D => Instruction::BIT(5, Reg8Symbol::L),
+            0x6E => Instruction::BIT_HL(5),
+            0x6F => Instruction::BIT(5, Reg8Symbol::A),
+
+            0x70 => Instruction::BIT(6, Reg8Symbol::B),
+            0x71 => Instruction::BIT(6, Reg8Symbol::C),
+            0x72 => Instruction::BIT(6, Reg8Symbol::D),
+            0x73 => Instruction::BIT(6, Reg8Symbol::E),
+            0x74 => Instruction::BIT(6, Reg8Symbol::H),
+            0x75 => Instruction::BIT(6, Reg8Symbol::L),
+            0x76 => Instruction::BIT_HL(6),
+            0x77 => Instruction::BIT(6, Reg8Symbol::A),
+
+            0x78 => Instruction::BIT(7, Reg8Symbol::B),
+            0x79 => Instruction::BIT(7, Reg8Symbol::C),
+            0x7A => Instruction::BIT(7, Reg8Symbol::D),
+            0x7B => Instruction::BIT(7, Reg8Symbol::E),
+            0x7C => Instruction::BIT(7, Reg8Symbol::H),
+            0x7D => Instruction::BIT(7, Reg8Symbol::L),
+            0x7E => Instruction::BIT_HL(7),
+            0x7F => Instruction::BIT(7, Reg8Symbol::A),
+
+            0x80 => Instruction::RES(0, Reg8Symbol::B),
+            0x81 => Instruction::RES(0, Reg8Symbol::C),
+            0x82 => Instruction::RES(0, Reg8Symbol::D),
+            0x83 => Instruction::RES(0, Reg8Symbol::E),
+            0x84 => Instruction::RES(0, Reg8Symbol::H),
+            0x85 => Instruction::RES(0, Reg8Symbol::L),
+            0x86 => Instruction::RES_HL(0),
+            0x87 => Instruction::RES(0, Reg8Symbol::A),
+
+            0x88 => Instruction::RES(1, Reg8Symbol::B),
+            0x89 => Instruction::RES(1, Reg8Symbol::C),
+            0x8A => Instruction::RES(1, Reg8Symbol::D),
+            0x8B => Instruction::RES(1, Reg8Symbol::E),
+            0x8C => Instruction::RES(1, Reg8Symbol::H),
+            0x8D => Instruction::RES(1, Reg8Symbol::L),
+            0x8E => Instruction::RES_HL(1),
+            0x8F => Instruction::RES(1, Reg8Symbol::A),
+
+            0x90 => Instruction::RES(2, Reg8Symbol::B),
+            0x91 => Instruction::RES(2, Reg8Symbol::C),
+            0x92 => Instruction::RES(2, Reg8Symbol::D),
+            0x93 => Instruction::RES(2, Reg8Symbol::E),
+            0x94 => Instruction::RES(2, Reg8Symbol::H),
+            0x95 => Instruction::RES(2, Reg8Symbol::L),
+            0x96 => Instruction::RES_HL(2),
+            0x97 => Instruction::RES(2, Reg8Symbol::A),
+
+            0x98 => Instruction::RES(3, Reg8Symbol::B),
+            0x99 => Instruction::RES(3, Reg8Symbol::C),
+            0x9A => Instruction::RES(3, Reg8Symbol::D),
+            0x9B => Instruction::RES(3, Reg8Symbol::E),
+            0x9C => Instruction::RES(3, Reg8Symbol::H),
+            0x9D => Instruction::RES(3, Reg8Symbol::L),
+            0x9E => Instruction::RES_HL(3),
+            0x9F => Instruction::RES(3, Reg8Symbol::A),
+
+            0xA0 => Instruction::RES(4, Reg8Symbol::B),
+            0xA1 => Instruction::RES(4, Reg8Symbol::C),
+            0xA2 => Instruction::RES(4, Reg8Symbol::D),
+            0xA3 => Instruction::RES(4, Reg8Symbol::E),
+            0xA4 => Instruction::RES(4, Reg8Symbol::H),
+            0xA5 => Instruction::RES(4, Reg8Symbol::L),
+            0xA6 => Instruction::RES_HL(4),
+            0xA7 => Instruction::RES(4, Reg8Symbol::A),
+
+            0xA8 => Instruction::RES(5, Reg8Symbol::B),
+            0xA9 => Instruction::RES(5, Reg8Symbol::C),
+            0xAA => Instruction::RES(5, Reg8Symbol::D),
+            0xAB => Instruction::RES(5, Reg8Symbol::E),
+            0xAC => Instruction::RES(5, Reg8Symbol::H),
+            0xAD => Instruction::RES(5, Reg8Symbol::L),
+            0xAE => Instruction::RES_HL(5),
+            0xAF => Instruction::RES(5, Reg8Symbol::A),
+
+            0xB0 => Instruction::RES(6, Reg8Symbol::B),
+            0xB1 => Instruction::RES(6, Reg8Symbol::C),
+            0xB2 => Instruction::RES(6, Reg8Symbol::D),
+            0xB3 => Instruction::RES(6, Reg8Symbol::E),
+            0xB4 => Instruction::RES(6, Reg8Symbol::H),
+            0xB5 => Instruction::RES(6, Reg8Symbol::L),
+            0xB6 => Instruction::RES_HL(6),
+            0xB7 => Instruction::RES(6, Reg8Symbol::A),
+
+            0xB8 => Instruction::RES(7, Reg8Symbol::B),
+            0xB9 => Instruction::RES(7, Reg8Symbol::C),
+            0xBA => Instruction::RES(7, Reg8Symbol::D),
+            0xBB => Instruction::RES(7, Reg8Symbol::E),
+            0xBC => Instruction::RES(7, Reg8Symbol::H),
+            0xBD => Instruction::RES(7, Reg8Symbol::L),
+            0xBE => Instruction::RES_HL(7),
+            0xBF => Instruction::RES(7, Reg8Symbol::A),
+
+            0xC0 => Instruction::SET(0, Reg8Symbol::B),
+            0xC1 => Instruction::SET(0, Reg8Symbol::C),
+            0xC2 => Instruction::SET(0, Reg8Symbol::D),
+            0xC3 => Instruction::SET(0, Reg8Symbol::E),
+            0xC4 => Instruction::SET(0, Reg8Symbol::H),
+            0xC5 => Instruction::SET(0, Reg8Symbol::L),
+            0xC6 => Instruction::SET_HL(0),
+            0xC7 => Instruction::SET(0, Reg8Symbol::A),
+
+            0xC8 => Instruction::SET(1, Reg8Symbol::B),
+            0xC9 => Instruction::SET(1, Reg8Symbol::C),
+            0xCA => Instruction::SET(1, Reg8Symbol::D),
+            0xCB => Instruction::SET(1, Reg8Symbol::E),
+            0xCC => Instruction::SET(1, Reg8Symbol::H),
+            0xCD => Instruction::SET(1, Reg8Symbol::L),
+            0xCE => Instruction::SET_HL(1),
+            0xCF => Instruction::SET(1, Reg8Symbol::A),
+
+            0xD0 => Instruction::SET(2, Reg8Symbol::B),
+            0xD1 => Instruction::SET(2, Reg8Symbol::C),
+            0xD2 => Instruction::SET(2, Reg8Symbol::D),
+            0xD3 => Instruction::SET(2, Reg8Symbol::E),
+            0xD4 => Instruction::SET(2, Reg8Symbol::H),
+            0xD5 => Instruction::SET(2, Reg8Symbol::L),
+            0xD6 => Instruction::SET_HL(2),
+            0xD7 => Instruction::SET(2, Reg8Symbol::A),
+
+            0xD8 => Instruction::SET(3, Reg8Symbol::B),
+            0xD9 => Instruction::SET(3, Reg8Symbol::C),
+            0xDA => Instruction::SET(3, Reg8Symbol::D),
+            0xDB => Instruction::SET(3, Reg8Symbol::E),
+            0xDC => Instruction::SET(3, Reg8Symbol::H),
+            0xDD => Instruction::SET(3, Reg8Symbol::L),
+            0xDE => Instruction::SET_HL(3),
+            0xDF => Instruction::SET(3, Reg8Symbol::A),
+
+            0xE0 => Instruction::SET(4, Reg8Symbol::B),
+            0xE1 => Instruction::SET(4, Reg8Symbol::C),
+            0xE2 => Instruction::SET(4, Reg8Symbol::D),
+            0xE3 => Instruction::SET(4, Reg8Symbol::E),
+            0xE4 => Instruction::SET(4, Reg8Symbol::H),
+            0xE5 => Instruction::SET(4, Reg8Symbol::L),
+            0xE6 => Instruction::SET_HL(4),
+            0xE7 => Instruction::SET(4, Reg8Symbol::A),
+
+            0xE8 => Instruction::SET(5, Reg8Symbol::B),
+            0xE9 => Instruction::SET(5, Reg8Symbol::C),
+            0xEA => Instruction::SET(5, Reg8Symbol::D),
+            0xEB => Instruction::SET(5, Reg8Symbol::E),
+            0xEC => Instruction::SET(5, Reg8Symbol::H),
+            0xED => Instruction::SET(5, Reg8Symbol::L),
+            0xEE => Instruction::SET_HL(5),
+            0xEF => Instruction::SET(5, Reg8Symbol::A),
+
+            0xF0 => Instruction::SET(6, Reg8Symbol::B),
+            0xF1 => Instruction::SET(6, Reg8Symbol::C),
+            0xF2 => Instruction::SET(6, Reg8Symbol::D),
+            0xF3 => Instruction::SET(6, Reg8Symbol::E),
+            0xF4 => Instruction::SET(6, Reg8Symbol::H),
+            0xF5 => Instruction::SET(6, Reg8Symbol::L),
+            0xF6 => Instruction::SET_HL(6),
+            0xF7 => Instruction::SET(6, Reg8Symbol::A),
+
+            0xF8 => Instruction::SET(7, Reg8Symbol::B),
+            0xF9 => Instruction::SET(7, Reg8Symbol::C),
+            0xFA => Instruction::SET(7, Reg8Symbol::D),
+            0xFB => Instruction::SET(7, Reg8Symbol::E),
+            0xFC => Instruction::SET(7, Reg8Symbol::H),
+            0xFD => Instruction::SET(7, Reg8Symbol::L),
+            0xFE => Instruction::SET_HL(7),
+            0xFF => Instruction::SET(7, Reg8Symbol::A),
         }
     }
 
@@ -1283,6 +1581,12 @@ impl CPU<'_> {
                 todo!();
             }
 
+            Instruction::PREFIX => {
+                let op = self.fetch();
+                let inst = self.decode_prefix(op);
+                4 + self.execute(inst)
+            }
+
             Instruction::RLC(r8s) => {
                 let reg = self.reg8_from_symbol(&r8s);
                 let val = reg.0;
@@ -1298,7 +1602,7 @@ impl CPU<'_> {
                 let new = self.u8_rot_left(val);
                 self.bus.write(hl as usize, new);
                 self.set_flag_z(new == 0);
-                16
+                12
             }
 
             Instruction::RL(r8s) => {
@@ -1316,7 +1620,7 @@ impl CPU<'_> {
                 let new = self.u8_rot_left_through_carry(val);
                 self.bus.write(hl as usize, new);
                 self.set_flag_z(new == 0);
-                16
+                12
             }
 
             Instruction::RRC(r8s) => {
@@ -1334,7 +1638,7 @@ impl CPU<'_> {
                 let new = self.u8_rot_right(val);
                 self.bus.write(hl as usize, new);
                 self.set_flag_z(new == 0);
-                16
+                12
             }
 
             Instruction::RR(r8s) => {
@@ -1352,7 +1656,7 @@ impl CPU<'_> {
                 let new = self.u8_rot_right_through_carry(val);
                 self.bus.write(hl as usize, new);
                 self.set_flag_z(new == 0);
-                16
+                12
             }
 
             Instruction::SLA(r8s) => {
@@ -1374,7 +1678,7 @@ impl CPU<'_> {
                 self.set_flag_z(new == 0);
                 self.set_flag_n(false);
                 self.set_flag_h(false);
-                16
+                12
             }
 
             Instruction::SRA(r8s) => {
@@ -1396,7 +1700,7 @@ impl CPU<'_> {
                 self.set_flag_z(new == 0);
                 self.set_flag_n(false);
                 self.set_flag_h(false);
-                16
+                12
             }
 
             Instruction::BIT(n, r8s) => {
@@ -1414,7 +1718,7 @@ impl CPU<'_> {
                 self.set_flag_c(val & 1 == 0);
                 self.set_flag_n(false);
                 self.set_flag_h(true);
-                16
+                12
             }
 
             Instruction::RES(n, r8s) => {
@@ -1427,7 +1731,7 @@ impl CPU<'_> {
                 let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
                 let val = self.bus.read(hl as usize) & !(1 << n);
                 self.bus.write(hl as usize, val);
-                16
+                12
             }
 
             Instruction::SET(n, r8s) => {
@@ -1440,7 +1744,7 @@ impl CPU<'_> {
                 let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
                 let val = self.bus.read(hl as usize) | (1 << n);
                 self.bus.write(hl as usize, val);
-                16
+                12
             }
 
             Instruction::NotImplemented => 4,

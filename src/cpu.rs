@@ -1,26 +1,58 @@
+use std::cell::Cell;
+
 use crate::bus::Bus;
 
 #[cfg(test)]
 mod tests;
 
-struct Register8(u8);
+struct Flags {
+    z: bool,
+    n: bool,
+    h: bool,
+    c: bool,
+}
 
-struct Register16<'a>(&'a mut Register8, &'a mut Register8);
-
-impl Register16<'_> {
-    fn get(&self) -> u16 {
-        (self.0 .0 as u16) << 8 | self.1 .0 as u16
+impl Flags {
+    fn new() -> Flags {
+        Flags {
+            z: false,
+            n: false,
+            h: false,
+            c: false,
+        }
     }
 
-    fn set(&mut self, val: u16) {
-        self.1 .0 = val as u8;
-        self.0 .0 = (val >> 8) as u8;
+    fn to_u8(&self) -> u8 {
+        let mut res: u8 = 0;
+        if self.z {
+            res |= 0b1;
+        }
+
+        if self.n {
+            res |= 0b10;
+        }
+
+        if self.h {
+            res |= 0b100;
+        }
+
+        if self.c {
+            res |= 0b1000;
+        }
+
+        res
+    }
+
+    fn set_from_u8(&mut self, val: u8) {
+        self.z = val & 1 == 1;
+        self.n = (val >> 1) & 1 == 1;
+        self.h = (val >> 2) & 1 == 1;
+        self.c = (val >> 3) & 1 == 1;
     }
 }
 
 enum Reg8Symbol {
     A,
-    F,
     B,
     C,
     D,
@@ -40,8 +72,6 @@ enum Reg16Symbol {
 
 enum FlagSymbol {
     Z,
-    N,
-    H,
     C,
 }
 
@@ -165,14 +195,14 @@ enum Instruction {
 }
 
 pub struct CPU<'a> {
-    a: Register8,
-    f: Register8,
-    b: Register8,
-    c: Register8,
-    d: Register8,
-    e: Register8,
-    h: Register8,
-    l: Register8,
+    a: Cell<u8>,
+    b: Cell<u8>,
+    c: Cell<u8>,
+    d: Cell<u8>,
+    e: Cell<u8>,
+    h: Cell<u8>,
+    l: Cell<u8>,
+    f: Flags,
     sp: u16,
     pc: u16,
     bus: &'a mut Bus<'a>,
@@ -181,14 +211,14 @@ pub struct CPU<'a> {
 impl CPU<'_> {
     pub fn init<'a>(bus: &'a mut Bus<'a>) -> CPU<'a> {
         CPU {
-            a: Register8(0),
-            f: Register8(0),
-            b: Register8(0),
-            c: Register8(0),
-            d: Register8(0),
-            e: Register8(0),
-            h: Register8(0),
-            l: Register8(0),
+            a: Cell::new(0),
+            b: Cell::new(0),
+            c: Cell::new(0),
+            d: Cell::new(0),
+            e: Cell::new(0),
+            h: Cell::new(0),
+            l: Cell::new(0),
+            f: Flags::new(),
             sp: 0xFFFE,
             pc: 0x100,
             bus,
@@ -208,127 +238,91 @@ impl CPU<'_> {
         (high << 8) | low
     }
 
-    fn set_flag_z(&mut self, on: bool) {
-        if on {
-            self.f.0 |= 0b0000_0001
-        } else {
-            self.f.0 &= 0b1111_1110
-        }
-    }
-
-    fn set_flag_n(&mut self, on: bool) {
-        if on {
-            self.f.0 |= 0b0000_0010
-        } else {
-            self.f.0 &= 0b1111_1101
-        }
-    }
-
-    fn set_flag_h(&mut self, on: bool) {
-        if on {
-            self.f.0 |= 0b0000_0100
-        } else {
-            self.f.0 &= 0b1111_1011
-        }
-    }
-
-    fn set_flag_c(&mut self, on: bool) {
-        if on {
-            self.f.0 |= 0b0000_1000
-        } else {
-            self.f.0 &= 0b1111_0111
-        }
-    }
-
-    fn get_flag_z(&self) -> bool {
-        self.f.0 & 0b0000_0001 == 0b0000_0001
-    }
-
-    fn get_flag_n(&self) -> bool {
-        self.f.0 & 0b0000_0010 == 0b0000_0010
-    }
-
-    fn get_flag_h(&self) -> bool {
-        self.f.0 & 0b0000_0100 == 0b0000_0100
-    }
-
-    fn get_flag_c(&self) -> bool {
-        self.f.0 & 0b0000_1000 == 0b0000_1000
-    }
-
-    fn set_flag(&mut self, flag: &FlagSymbol, on: bool) {
-        match flag {
-            FlagSymbol::Z => self.set_flag_z(on),
-            FlagSymbol::N => self.set_flag_n(on),
-            FlagSymbol::H => self.set_flag_h(on),
-            FlagSymbol::C => self.set_flag_c(on),
-        }
-    }
-
-    fn get_flag(&self, flag: &FlagSymbol) -> bool {
-        match flag {
-            FlagSymbol::Z => self.get_flag_z(),
-            FlagSymbol::N => self.get_flag_n(),
-            FlagSymbol::H => self.get_flag_h(),
-            FlagSymbol::C => self.get_flag_c(),
-        }
-    }
-
-    fn reg8_from_symbol(&mut self, sym: &Reg8Symbol) -> &mut Register8 {
+    fn get_r8(&self, sym: &Reg8Symbol) -> u8 {
         match sym {
-            Reg8Symbol::A => &mut self.a,
-            Reg8Symbol::F => &mut self.f,
-            Reg8Symbol::B => &mut self.b,
-            Reg8Symbol::C => &mut self.c,
-            Reg8Symbol::D => &mut self.d,
-            Reg8Symbol::E => &mut self.e,
-            Reg8Symbol::H => &mut self.h,
-            Reg8Symbol::L => &mut self.l,
+            Reg8Symbol::A => self.a.get(),
+            Reg8Symbol::B => self.b.get(),
+            Reg8Symbol::C => self.c.get(),
+            Reg8Symbol::D => self.d.get(),
+            Reg8Symbol::E => self.e.get(),
+            Reg8Symbol::H => self.h.get(),
+            Reg8Symbol::L => self.l.get(),
         }
     }
 
-    fn reg16_from_symbol(&mut self, sym: &Reg16Symbol) -> Register16 {
+    fn set_r8(&self, sym: &Reg8Symbol, val: u8) {
         match sym {
-            Reg16Symbol::BC => Register16(&mut self.b, &mut self.c),
-            Reg16Symbol::DE => Register16(&mut self.d, &mut self.e),
+            Reg8Symbol::A => self.a.set(val),
+            Reg8Symbol::B => self.b.set(val),
+            Reg8Symbol::C => self.c.set(val),
+            Reg8Symbol::D => self.d.set(val),
+            Reg8Symbol::E => self.e.set(val),
+            Reg8Symbol::H => self.h.set(val),
+            Reg8Symbol::L => self.l.set(val),
+        }
+    }
+
+    fn get_r16(&self, sym: &Reg16Symbol) -> u16 {
+        let (high, low) = match sym {
+            Reg16Symbol::BC => (self.get_r8(&Reg8Symbol::B), self.get_r8(&Reg8Symbol::C)),
+            Reg16Symbol::DE => (self.get_r8(&Reg8Symbol::D), self.get_r8(&Reg8Symbol::E)),
             Reg16Symbol::HL | Reg16Symbol::HLI | Reg16Symbol::HLD => {
-                Register16(&mut self.h, &mut self.l)
+                (self.get_r8(&Reg8Symbol::H), self.get_r8(&Reg8Symbol::L))
+            }
+        };
+
+        (high as u16) << 8 | low as u16
+    }
+
+    fn set_r16(&self, sym: &Reg16Symbol, val: u16) {
+        let (high, low) = ((val >> 8) as u8, val as u8);
+
+        match sym {
+            Reg16Symbol::BC => {
+                self.set_r8(&Reg8Symbol::B, high);
+                self.set_r8(&Reg8Symbol::C, low);
+            }
+
+            Reg16Symbol::DE => {
+                self.set_r8(&Reg8Symbol::D, high);
+                self.set_r8(&Reg8Symbol::E, low);
+            }
+
+            Reg16Symbol::HL | Reg16Symbol::HLI | Reg16Symbol::HLD => {
+                self.set_r8(&Reg8Symbol::H, high);
+                self.set_r8(&Reg8Symbol::L, low);
             }
         }
     }
 
     fn inc_r16(&mut self, r16s: Reg16Symbol) -> u8 {
-        let mut r16 = self.reg16_from_symbol(&r16s);
-        let val = r16.get().wrapping_add(1);
-        r16.set(val);
+        self.set_r16(&r16s, self.get_r16(&r16s).wrapping_add(1));
         8
     }
 
     fn dec_r16(&mut self, r16s: Reg16Symbol) -> u8 {
-        let mut r16 = self.reg16_from_symbol(&r16s);
-        let val = r16.get().wrapping_sub(1);
-        r16.set(val);
+        self.set_r16(&r16s, self.get_r16(&r16s).wrapping_sub(1));
         8
     }
 
     fn sum_u16_with_flags(&mut self, n1: u16, n2: u16) -> u16 {
         // set flag c on actual overflow
         let (res, c) = n1.overflowing_add(n2);
-        self.set_flag_c(c);
+        self.f.c = c;
 
         // set flag h if the sum of the bottom 12 bits activate the 13th bit
-        self.set_flag_h((n1 & 0xFFF) as u32 + (n2 & 0xFFF) as u32 > 0xFFF);
+        self.f.h = (n1 & 0xFFF) as u32 + (n2 & 0xFFF) as u32 > 0xFFF;
 
         res
     }
 
     fn sum_u8_with_flags(&mut self, n1: u8, n2: u8) -> u8 {
         // overflow from bit 3
-        self.set_flag_h((n1 & 0xF) as u16 + (n2 & 0xF) as u16 > 0xF);
+        self.f.h = (n1 & 0xF) as u16 + (n2 & 0xF) as u16 > 0xF;
 
         // overflow from bit 7
         let (res, c) = n1.overflowing_add(n2);
-        self.set_flag_c(c);
+        self.f.c = c;
 
         res
     }
@@ -337,10 +331,10 @@ impl CPU<'_> {
         let res = n1.wrapping_sub(n2);
 
         // borrow from bit 4
-        self.set_flag_h((n1 & 0x0F) < (n2 & 0x0F));
+        self.f.h = (n1 & 0x0F) < (n2 & 0x0F);
 
         // full borrow
-        self.set_flag_c(n1 < n2);
+        self.f.c = n1 < n2;
 
         res
     }
@@ -370,67 +364,74 @@ impl CPU<'_> {
     }
 
     fn u8_rot_left(&mut self, val: u8) -> u8 {
-        self.set_flag_z(false);
-        self.set_flag_n(false);
-        self.set_flag_h(false);
+        self.f.c = false;
+        self.f.n = false;
+        self.f.h = false;
 
         let res = val.rotate_left(1);
 
         // set flag c to the leftmost bit that was rotated to the least significant
         // position
-        self.set_flag_c(val & 1 == 1);
+        self.f.c = val & 1 == 1;
 
         res
     }
 
     fn u8_rot_left_through_carry(&mut self, val: u8) -> u8 {
-        self.set_flag_z(false);
-        self.set_flag_n(false);
-        self.set_flag_h(false);
+        self.f.z = false;
+        self.f.n = false;
+        self.f.h = false;
 
         // shift left, then set the last bit to current value of c flag, and set c flag to
         // the shifted out bit
         let left_bit = val & 0b1000_0000 == 0b1000_0000;
         let mut res = val << 1;
 
-        if self.get_flag_c() {
+        if self.f.c {
             res |= 0b0000_0001;
         } else {
             res &= 0b1111_1110;
         }
 
-        self.set_flag_c(left_bit);
+        self.f.c = left_bit;
 
         res
     }
 
     fn u8_rot_right_through_carry(&mut self, val: u8) -> u8 {
-        self.set_flag_z(false);
-        self.set_flag_n(false);
-        self.set_flag_h(false);
+        self.f.z = false;
+        self.f.n = false;
+        self.f.h = false;
 
         let right_bit = val & 0b0000_0001 == 0b0000_0001;
         let mut res = val >> 1;
 
-        if self.get_flag_c() {
+        if self.f.c {
             res |= 0b1000_0000;
         } else {
             res &= 0b0111_1111;
         }
 
-        self.set_flag_c(right_bit);
+        self.f.c = right_bit;
 
         res
     }
 
     fn u8_rot_right(&mut self, val: u8) -> u8 {
-        self.set_flag_z(false);
-        self.set_flag_n(false);
-        self.set_flag_h(false);
+        self.f.z = false;
+        self.f.n = false;
+        self.f.h = false;
 
-        self.set_flag_c(val & 1 == 1);
+        self.f.c = val & 1 == 1;
 
         val.rotate_right(1)
+    }
+
+    fn get_flag(&self, sym: &FlagSymbol) -> bool {
+        match sym {
+            FlagSymbol::Z => self.f.z,
+            FlagSymbol::C => self.f.c,
+        }
     }
 
     fn decode(&mut self, opcode: u8) -> Instruction {
@@ -947,24 +948,22 @@ impl CPU<'_> {
 
             Instruction::LD_r8_r8(r8s1, r8s2) => {
                 // copy value at r82 to r81
-                let r82 = self.reg8_from_symbol(&r8s2);
-                let val = r82.0;
-                let r81 = self.reg8_from_symbol(&r8s1);
-                r81.0 = val;
+                let val = self.get_r8(&r8s2);
+                self.set_r8(&r8s1, val);
                 4
             }
 
             Instruction::LD_r8_n8(r8s) => {
                 let val = self.fetch();
-                self.reg8_from_symbol(&r8s).0 = val;
+                self.set_r8(&r8s, val);
                 8
             }
 
             Instruction::LD_r8_r16(r8s, r16s) => {
                 // get value pointed to by r16 and store in r8
-                let addr = self.reg16_from_symbol(&r16s).get() as usize;
+                let addr = self.get_r16(&r16s) as usize;
                 let val = self.bus.read(addr as usize);
-                self.reg8_from_symbol(&r8s).0 = val;
+                self.set_r8(&r8s, val);
 
                 if r16s == Reg16Symbol::HLI {
                     self.inc_r16(r16s);
@@ -976,11 +975,8 @@ impl CPU<'_> {
             }
 
             Instruction::LD_r16_r8(r16s, r8s) => {
-                let r16 = self.reg16_from_symbol(&r16s);
-                let address = r16.get() as usize;
-
-                let r8 = self.reg8_from_symbol(&r8s);
-                let value = r8.0;
+                let address = self.get_r16(&r16s) as usize;
+                let value = self.get_r8(&r8s);
                 self.bus.write(address, value);
 
                 if r16s == Reg16Symbol::HLI {
@@ -994,8 +990,7 @@ impl CPU<'_> {
 
             Instruction::LD_r16_n16(r16s) => {
                 let val = self.fetch_2();
-                let mut r16 = self.reg16_from_symbol(&r16s);
-                r16.set(val);
+                self.set_r16(&r16s, val);
                 12
             }
 
@@ -1016,8 +1011,7 @@ impl CPU<'_> {
 
             Instruction::LD_HL_n8 => {
                 let value = self.fetch();
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL);
-                let address = hl.get() as usize;
+                let address = self.get_r16(&Reg16Symbol::HL) as usize;
                 self.bus.write(address, value);
                 12
             }
@@ -1025,17 +1019,17 @@ impl CPU<'_> {
             Instruction::INC_r16(r16s) => self.inc_r16(r16s),
 
             Instruction::INC_r8(r8s) => {
-                let r = self.reg8_from_symbol(&r8s).0;
+                let r = self.get_r8(&r8s);
 
-                self.set_flag_n(false);
+                self.f.n = false;
 
                 // check overflow from bit 3 (bits 0-3 are on)
-                self.set_flag_h(r & 0xF == 0xF);
+                self.f.h = r & 0xF == 0xF;
 
                 let new_val = r.wrapping_add(1);
-                self.set_flag_z(new_val == 0);
+                self.f.z = new_val == 0;
 
-                self.reg8_from_symbol(&r8s).0 = r;
+                self.set_r8(&r8s, new_val);
                 4
             }
 
@@ -1047,21 +1041,21 @@ impl CPU<'_> {
             Instruction::DEC_r16(r16s) => self.dec_r16(r16s),
 
             Instruction::DEC_r8(r8s) => {
-                let r = self.reg8_from_symbol(&r8s).0;
+                let r = self.get_r8(&r8s);
 
-                self.set_flag_n(true);
+                self.f.n = true;
 
                 // check if a borrow from bit 4 is required (bits 0-3 are off)
                 if r & 0x0F == 0 {
-                    self.set_flag_h(true);
+                    self.f.h = true;
                 }
 
                 let new_val = r.wrapping_sub(1);
                 if new_val == 0 {
-                    self.set_flag_z(true);
+                    self.f.z = true;
                 }
 
-                self.reg8_from_symbol(&r8s).0 = r;
+                self.set_r8(&r8s, new_val);
                 4
             }
 
@@ -1071,55 +1065,56 @@ impl CPU<'_> {
             }
 
             Instruction::ADD_HL_r16(r16s) => {
-                self.set_flag_n(false);
+                self.f.n = false;
 
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
-                let r16_val = self.reg16_from_symbol(&r16s).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
+                let r16_val = self.get_r16(&r16s);
 
                 let res = self.sum_u16_with_flags(hl, r16_val);
 
-                self.reg16_from_symbol(&Reg16Symbol::HL).set(res);
+                self.set_r16(&Reg16Symbol::HL, res);
                 8
             }
 
             Instruction::ADD_HL_SP => {
-                self.set_flag_n(false);
+                self.f.n = false;
 
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
 
                 let res = self.sum_u16_with_flags(hl, self.sp);
-                self.reg16_from_symbol(&Reg16Symbol::HL).set(res);
+                self.set_r16(&Reg16Symbol::HL, res);
                 8
             }
 
             Instruction::ADD_A_r8(r8s) => {
-                let reg = self.reg8_from_symbol(&r8s);
-                let val = reg.0;
+                let val = self.get_r8(&r8s);
 
-                self.a.0 = self.sum_u8_with_flags(self.a.0, val);
+                let res = self.sum_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
+                self.set_r8(&Reg8Symbol::A, res);
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
+                self.f.z = res == 0;
+                self.f.n = false;
                 4
             }
 
             Instruction::ADD_A_HL => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize);
 
-                self.a.0 = self.sum_u8_with_flags(self.a.0, val);
+                let res = self.sum_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
+                self.set_r8(&Reg8Symbol::A, res);
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
+                self.f.z = res == 0;
+                self.f.n = false;
                 8
             }
 
             Instruction::ADD_A_n8 => {
                 let val = self.fetch();
-                self.a.0 = self.sum_u8_with_flags(self.a.0, val);
+                let res = self.sum_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
+                self.f.z = res == 0;
+                self.f.n = false;
                 8
             }
 
@@ -1130,260 +1125,256 @@ impl CPU<'_> {
 
                 // set h and c flags as u8 addition
                 let sp_low = (self.sp & 0xFF) as u8;
-                self.set_flag_h((sp_low & 0x0F) + (ofs & 0x0F) > 0x0F);
-                self.set_flag_c((sp_low as u16) + (ofs as u16) > 0xFF);
+                self.f.h = (sp_low & 0x0F) + (ofs & 0x0F) > 0x0F;
+                self.f.c = (sp_low as u16) + (ofs as u16) > 0xFF;
 
                 self.sp = self.sp.wrapping_add(ofs_u16);
 
-                self.set_flag_z(self.sp == 0);
-                self.set_flag_n(false);
+                self.f.z = self.sp == 0;
+                self.f.n = false;
                 16
             }
 
             Instruction::ADC_A_r8(r8s) => {
-                let carry = if self.get_flag_c() { 1 } else { 0 };
-                let reg = self.reg8_from_symbol(&r8s);
-                let val = reg.0.wrapping_add(carry);
+                let carry = if self.f.c { 1 } else { 0 };
+                let reg = self.get_r8(&r8s);
+                let val = reg.wrapping_add(carry);
 
-                self.a.0 = self.sum_u8_with_flags(self.a.0, val);
+                let res = self.sum_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
+                self.f.z = res == 0;
+                self.f.n = false;
                 4
             }
 
             Instruction::ADC_A_HL => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize);
 
-                self.a.0 = self.sum_u8_with_flags(self.a.0, val);
+                let res = self.sum_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
+                self.f.z = res == 0;
+                self.f.n = false;
                 8
             }
 
             Instruction::ADC_A_n8 => {
-                let carry = if self.get_flag_c() { 1 } else { 0 };
+                let carry = if self.f.c { 1 } else { 0 };
                 let val = self.fetch();
 
-                self.a.0 = self.sum_u8_with_flags(self.a.0, val);
+                let res = self.sum_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
+                self.f.z = res == 0;
+                self.f.n = false;
                 8
             }
 
             Instruction::SUB_A_r8(r8s) => {
-                let reg = self.reg8_from_symbol(&r8s);
-                let val = reg.0;
+                let val = self.get_r8(&r8s);
 
-                self.a.0 = self.sub_u8_with_flags(self.a.0, val);
+                let res = self.sub_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
+                self.f.z = res == 0;
+                self.f.n = false;
                 4
             }
 
             Instruction::SUB_A_HL => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize);
 
-                self.a.0 = self.sub_u8_with_flags(self.a.0, val);
+                let res = self.sub_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
+                self.f.z = res == 0;
+                self.f.n = false;
                 8
             }
 
             Instruction::SUB_A_n8 => {
                 let val = self.fetch();
 
-                self.a.0 = self.sub_u8_with_flags(self.a.0, val);
+                let res = self.sub_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
+                self.f.z = res == 0;
+                self.f.n = false;
                 8
             }
 
             Instruction::SBC_A_r8(r8s) => {
-                let carry = if self.get_flag_c() { 1 } else { 0 };
-                let reg = self.reg8_from_symbol(&r8s);
-                let val = reg.0.wrapping_add(carry);
+                let carry = if self.f.c { 1 } else { 0 };
+                let reg = self.get_r8(&r8s);
+                let val = reg.wrapping_add(carry);
 
-                self.a.0 = self.sub_u8_with_flags(self.a.0, val);
+                let res = self.sub_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
+                self.f.z = res == 0;
+                self.f.n = false;
                 4
             }
 
             Instruction::SBC_A_HL => {
-                let carry = if self.get_flag_c() { 1 } else { 0 };
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let carry = if self.f.c { 1 } else { 0 };
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize).wrapping_add(carry);
 
-                self.a.0 = self.sub_u8_with_flags(self.a.0, val);
+                let res = self.sub_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
+                self.f.z = res == 0;
+                self.f.n = false;
                 8
             }
 
             Instruction::SBC_A_n8 => {
-                let carry = if self.get_flag_c() { 1 } else { 0 };
+                let carry = if self.f.c { 1 } else { 0 };
                 let val = self.fetch();
 
-                self.a.0 = self.sub_u8_with_flags(self.a.0, val);
+                let res = self.sub_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
+                self.f.z = res == 0;
+                self.f.n = false;
                 8
             }
 
             Instruction::AND_A_r8(r8s) => {
-                let reg = self.reg8_from_symbol(&r8s);
-                let val = reg.0;
+                let val = self.get_r8(&r8s);
 
-                self.a.0 = self.a.0 & val;
+                let res = self.get_r8(&Reg8Symbol::A) & val;
+                self.set_r8(&Reg8Symbol::A, res);
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(true);
-                self.set_flag_c(false);
+                self.f.z = res == 0;
+                self.f.n = false;
+                self.f.h = true;
+                self.f.c = false;
                 4
             }
 
             Instruction::AND_A_HL => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize);
 
-                self.a.0 = self.a.0 & val;
+                let res = self.get_r8(&Reg8Symbol::A) & val;
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(true);
-                self.set_flag_c(false);
+                self.f.z = res == 0;
+                self.f.n = false;
+                self.f.h = true;
+                self.f.c = false;
                 8
             }
 
             Instruction::AND_A_n8 => {
                 let val = self.fetch();
 
-                self.a.0 = self.a.0 & val;
+                let res = self.get_r8(&Reg8Symbol::A) & val;
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(true);
-                self.set_flag_c(false);
+                self.f.z = res == 0;
+                self.f.n = false;
+                self.f.h = true;
+                self.f.c = false;
                 8
             }
 
             Instruction::XOR_A_r8(r8s) => {
-                let reg = self.reg8_from_symbol(&r8s);
-                let val = reg.0;
+                let val = self.get_r8(&r8s);
 
-                self.a.0 = self.a.0 ^ val;
+                let res = self.get_r8(&Reg8Symbol::A) ^ val;
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-                self.set_flag_c(false);
+                self.f.z = res == 0;
+                self.f.n = false;
+                self.f.h = false;
+                self.f.c = false;
                 4
             }
 
             Instruction::XOR_A_HL => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize);
 
-                self.a.0 = self.a.0 ^ val;
+                let res = self.get_r8(&Reg8Symbol::A) ^ val;
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-                self.set_flag_c(false);
+                self.f.z = res == 0;
+                self.f.n = false;
+                self.f.h = false;
+                self.f.c = false;
                 8
             }
 
             Instruction::XOR_A_n8 => {
                 let val = self.fetch();
 
-                self.a.0 = self.a.0 ^ val;
+                let res = self.get_r8(&Reg8Symbol::A) ^ val;
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-                self.set_flag_c(false);
+                self.f.z = res == 0;
+                self.f.n = false;
+                self.f.h = false;
+                self.f.c = false;
                 8
             }
 
             Instruction::OR_A_r8(r8s) => {
-                let reg = self.reg8_from_symbol(&r8s);
-                let val = reg.0;
+                let val = self.get_r8(&r8s);
 
-                self.a.0 = self.a.0 | val;
+                let res = self.get_r8(&Reg8Symbol::A) | val;
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-                self.set_flag_c(false);
+                self.f.z = res == 0;
+                self.f.n = false;
+                self.f.h = false;
+                self.f.c = false;
                 4
             }
 
             Instruction::OR_A_HL => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize);
 
-                self.a.0 = self.a.0 | val;
+                let res = self.get_r8(&Reg8Symbol::A) | val;
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-                self.set_flag_c(false);
+                self.f.z = res == 0;
+                self.f.n = false;
+                self.f.h = false;
+                self.f.c = false;
                 8
             }
 
             Instruction::OR_A_n8 => {
                 let val = self.fetch();
 
-                self.a.0 = self.a.0 | val;
+                let res = self.get_r8(&Reg8Symbol::A) | val;
 
-                self.set_flag_z(self.a.0 == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-                self.set_flag_c(false);
+                self.f.z = res == 0;
+                self.f.n = false;
+                self.f.h = false;
+                self.f.c = false;
                 8
             }
 
             Instruction::CP_A_r8(r8s) => {
-                let reg = self.reg8_from_symbol(&r8s);
-                let val = reg.0;
+                let val = self.get_r8(&r8s);
 
-                let res = self.sub_u8_with_flags(self.a.0, val);
+                let res = self.sub_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
 
-                self.set_flag_z(res == 0);
-                self.set_flag_n(false);
+                self.f.z = res == 0;
+                self.f.n = false;
                 4
             }
 
             Instruction::CP_A_HL => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize);
 
-                let res = self.sub_u8_with_flags(self.a.0, val);
+                let res = self.sub_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
 
-                self.set_flag_z(res == 0);
-                self.set_flag_n(false);
+                self.f.z = res == 0;
+                self.f.n = false;
                 8
             }
 
             Instruction::CP_A_n8 => {
                 let val = self.fetch();
 
-                let res = self.sub_u8_with_flags(self.a.0, val);
+                let res = self.sub_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
 
-                self.set_flag_z(res == 0);
-                self.set_flag_n(false);
+                self.f.z = res == 0;
+                self.f.n = false;
                 8
             }
 
@@ -1441,25 +1432,23 @@ impl CPU<'_> {
             }
 
             Instruction::PUSH_r16(r16s) => {
-                let reg = self.reg16_from_symbol(&r16s);
-                let val = reg.get();
+                let val = self.get_r16(&r16s);
                 self.stack_push_u16(val);
                 16
             }
 
             Instruction::POP_r16(r16s) => {
                 let val = self.stack_pop_u16();
-                let mut reg = self.reg16_from_symbol(&r16s);
-                reg.set(val);
+                self.set_r16(&r16s, val);
                 12
             }
 
             Instruction::POP_AF => {
                 let f_new = self.stack_pop_u8() & 0xF0;
-                self.f.0 = f_new;
+                self.f.set_from_u8(f_new >> 4);
 
                 let a_new = self.stack_pop_u8();
-                self.a.0 = a_new;
+                self.set_r8(&Reg8Symbol::A, a_new);
                 12
             }
 
@@ -1494,82 +1483,86 @@ impl CPU<'_> {
             }
 
             Instruction::RLCA => {
-                let val = self.a.0;
-                self.a.0 = self.u8_rot_left(val);
+                let mut val = self.get_r8(&Reg8Symbol::A);
+                val = self.u8_rot_left(val);
+                self.set_r8(&Reg8Symbol::A, val);
                 4
             }
 
             Instruction::RRCA => {
-                let val = self.a.0;
-                self.a.0 = self.u8_rot_right(val);
+                let mut val = self.get_r8(&Reg8Symbol::A);
+                val = self.u8_rot_right(val);
+                self.set_r8(&Reg8Symbol::A, val);
                 4
             }
 
             Instruction::RLA => {
-                let val = self.a.0;
-                self.a.0 = self.u8_rot_left_through_carry(val);
+                let mut val = self.get_r8(&Reg8Symbol::A);
+                val = self.u8_rot_left_through_carry(val);
+                self.set_r8(&Reg8Symbol::A, val);
                 4
             }
 
             Instruction::RRA => {
-                let val = self.a.0;
-                self.a.0 = self.u8_rot_right_through_carry(val);
+                let mut val = self.get_r8(&Reg8Symbol::A);
+                val = self.u8_rot_right_through_carry(val);
+                self.set_r8(&Reg8Symbol::A, val);
                 4
             }
 
             Instruction::DAA => {
                 let mut adj = 0;
-                self.set_flag_h(false);
+                self.f.h = false;
 
-                if self.get_flag_n() {
-                    if self.get_flag_h() {
+                if self.f.n {
+                    if self.f.h {
                         adj += 0x06;
                     }
 
-                    if self.get_flag_c() {
+                    if self.f.c {
                         adj += 0x60;
                     }
 
-                    self.a.0 -= adj;
+                    self.set_r8(&Reg8Symbol::A, self.get_r8(&Reg8Symbol::A) - adj);
                 } else {
-                    if self.get_flag_h() || self.a.0 & 0x0F > 0x09 {
+                    if self.f.h || self.get_r8(&Reg8Symbol::A) & 0x0F > 0x09 {
                         adj += 0x06;
                     }
 
-                    if self.get_flag_c() || self.a.0 > 0x99 {
+                    if self.f.c || self.get_r8(&Reg8Symbol::A) > 0x99 {
                         adj += 0x60;
-                        self.set_flag_c(true);
+                        self.f.c = true;
                     }
 
-                    self.a.0 += adj;
+                    self.set_r8(&Reg8Symbol::A, self.get_r8(&Reg8Symbol::A) + adj);
                 }
 
-                if self.a.0 == 0 {
-                    self.set_flag_z(true);
+                if self.get_r8(&Reg8Symbol::A) == 0 {
+                    self.f.z = true;
                 }
 
                 4
             }
 
             Instruction::CPL => {
-                self.set_flag_n(true);
-                self.set_flag_h(true);
+                self.f.n = true;
+                self.f.h = true;
 
-                self.a.0 = !self.a.0;
+                self.set_r8(&Reg8Symbol::A, !self.get_r8(&Reg8Symbol::A));
                 4
             }
 
             Instruction::SCF => {
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-                self.set_flag_c(true);
+                self.f.n = false;
+                self.f.h = false;
+                self.f.c = true;
                 4
             }
 
             Instruction::CCF => {
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-                self.set_flag_c(!self.get_flag_c());
+                self.f.n = false;
+                self.f.h = false;
+                self.f.c = !self.f.c;
                 4
             }
 
@@ -1588,141 +1581,134 @@ impl CPU<'_> {
             }
 
             Instruction::RLC(r8s) => {
-                let val = self.reg8_from_symbol(&r8s).0;
+                let val = self.get_r8(&r8s);
                 let new = self.u8_rot_left(val);
-                let reg = self.reg8_from_symbol(&r8s);
-                reg.0 = new;
-                self.set_flag_z(new == 0);
+                self.set_r8(&r8s, new);
+                self.f.z = new == 0;
                 8
             }
 
             Instruction::RLC_HL => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize);
                 let new = self.u8_rot_left(val);
                 self.bus.write(hl as usize, new);
-                self.set_flag_z(new == 0);
+                self.f.z = new == 0;
                 12
             }
 
             Instruction::RL(r8s) => {
-                let val = self.reg8_from_symbol(&r8s).0;
+                let val = self.get_r8(&r8s);
                 let new = self.u8_rot_left_through_carry(val);
-                let reg = self.reg8_from_symbol(&r8s);
-                reg.0 = new;
-                self.set_flag_z(new == 0);
+                self.set_r8(&r8s, new);
+                self.f.z = new == 0;
                 8
             }
 
             Instruction::RL_HL => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize);
                 let new = self.u8_rot_left_through_carry(val);
                 self.bus.write(hl as usize, new);
-                self.set_flag_z(new == 0);
+                self.f.z = new == 0;
                 12
             }
 
             Instruction::RRC(r8s) => {
-                let val = self.reg8_from_symbol(&r8s).0;
+                let val = self.get_r8(&r8s);
                 let new = self.u8_rot_right(val);
-                let reg = self.reg8_from_symbol(&r8s);
-                reg.0 = new;
-                self.set_flag_z(new == 0);
+                self.set_r8(&r8s, new);
+                self.f.z = new == 0;
                 8
             }
 
             Instruction::RRC_HL => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize);
                 let new = self.u8_rot_right(val);
                 self.bus.write(hl as usize, new);
-                self.set_flag_z(new == 0);
+                self.f.z = new == 0;
                 12
             }
 
             Instruction::RR(r8s) => {
-                let val = self.reg8_from_symbol(&r8s).0;
+                let val = self.get_r8(&r8s);
                 let new = self.u8_rot_right_through_carry(val);
-                let reg = self.reg8_from_symbol(&r8s);
-                reg.0 = new;
-                self.set_flag_z(new == 0);
+                self.set_r8(&r8s, new);
+                self.f.z = new == 0;
                 8
             }
 
             Instruction::RR_HL => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize);
                 let new = self.u8_rot_right_through_carry(val);
                 self.bus.write(hl as usize, new);
-                self.set_flag_z(new == 0);
+                self.f.z = new == 0;
                 12
             }
 
             Instruction::SLA(r8s) => {
-                let val = self.reg8_from_symbol(&r8s).0;
-                self.set_flag_c(val & 0b1000_0000 == 1);
+                let val = self.get_r8(&r8s);
+                self.f.c = val & 0b1000_0000 == 1;
                 let new = val << 1;
-                self.set_flag_z(new == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-
-                self.reg8_from_symbol(&r8s).0 = new;
+                self.f.z = new == 0;
+                self.f.n = false;
+                self.f.h = false;
+                self.set_r8(&r8s, new);
                 8
             }
 
             Instruction::SLA_HL => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize);
-                self.set_flag_c(val & 0b1000_0000 == 1);
+                self.f.c = val & 0b1000_0000 == 1;
                 let new = val << 1;
                 self.bus.write(hl as usize, new);
-                self.set_flag_z(new == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
+                self.f.z = new == 0;
+                self.f.n = false;
+                self.f.h = false;
                 12
             }
 
             Instruction::SRA(r8s) => {
-                let val = self.reg8_from_symbol(&r8s).0;
-                self.set_flag_c(val & 1 == 1);
+                let val = self.get_r8(&r8s);
+                self.f.c = val & 1 == 1;
                 let new = val >> 1;
-                self.set_flag_z(new == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-
-                self.reg8_from_symbol(&r8s).0 = new;
+                self.f.z = new == 0;
+                self.f.n = false;
+                self.f.h = false;
+                self.set_r8(&r8s, new);
                 8
             }
 
             Instruction::SRA_HL => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize);
-                self.set_flag_c(val & 1 == 1);
+                self.f.c = val & 1 == 1;
                 let new = val >> 1;
                 self.bus.write(hl as usize, new);
-                self.set_flag_z(new == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
+                self.f.z = new == 0;
+                self.f.n = false;
+                self.f.h = false;
                 12
             }
 
             Instruction::SWAP(r8s) => {
-                let val = self.reg8_from_symbol(&r8s).0;
+                let val = self.get_r8(&r8s);
                 let high = val & 0xF0;
                 let low = val & 0x0F;
                 let new = (low << 4) | high;
-                self.set_flag_z(val == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-                self.set_flag_c(false);
-
-                self.reg8_from_symbol(&r8s).0 = new;
+                self.f.z = val == 0;
+                self.f.n = false;
+                self.f.h = false;
+                self.f.c = false;
+                self.set_r8(&r8s, new);
                 8
             }
 
             Instruction::SWAP_HL => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize);
                 let high = val & 0xF0;
                 let low = val & 0x0F;
@@ -1732,68 +1718,67 @@ impl CPU<'_> {
             }
 
             Instruction::SRL(r8s) => {
-                let val = self.reg8_from_symbol(&r8s).0;
-                self.set_flag_c(val & 1 == 1);
+                let val = self.get_r8(&r8s);
+                self.f.c = val & 1 == 1;
                 let new = val >> 1;
-                self.set_flag_z(val == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
-
-                self.reg8_from_symbol(&r8s).0 = new;
+                self.f.z = val == 0;
+                self.f.n = false;
+                self.f.h = false;
+                self.set_r8(&r8s, new);
                 8
             }
 
             Instruction::SRL_HL => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize);
-                self.set_flag_c(val & 1 == 1);
+                self.f.c = val & 1 == 1;
                 let new = val >> 1;
                 self.bus.write(hl as usize, new);
-                self.set_flag_z(new == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(false);
+                self.f.z = new == 0;
+                self.f.n = false;
+                self.f.h = false;
                 12
             }
 
             Instruction::BIT(n, r8s) => {
-                let reg = self.reg8_from_symbol(&r8s);
-                let val = reg.0 >> n;
-                self.set_flag_z(val & 1 == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(true);
+                let reg = self.get_r8(&r8s);
+                let val = reg >> n;
+                self.f.z = val & 1 == 0;
+                self.f.n = false;
+                self.f.h = true;
                 8
             }
 
             Instruction::BIT_HL(n) => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize) >> n;
-                self.set_flag_c(val & 1 == 0);
-                self.set_flag_n(false);
-                self.set_flag_h(true);
+                self.f.c = val & 1 == 0;
+                self.f.n = false;
+                self.f.h = true;
                 12
             }
 
             Instruction::RES(n, r8s) => {
-                let reg = self.reg8_from_symbol(&r8s);
-                reg.0 = reg.0 & !(1 << n);
+                let reg = self.get_r8(&r8s);
+                self.set_r8(&r8s, reg & !(1 << n));
                 8
             }
 
             Instruction::RES_HL(n) => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize) & !(1 << n);
                 self.bus.write(hl as usize, val);
                 12
             }
 
             Instruction::SET(n, r8s) => {
-                let reg = self.reg8_from_symbol(&r8s);
-                reg.0 = reg.0 | (1 << n);
+                let reg = self.get_r8(&r8s);
+                self.set_r8(&r8s, reg | (1 << n));
                 8
             }
 
             Instruction::SET_HL(n) => {
-                let hl = self.reg16_from_symbol(&Reg16Symbol::HL).get();
+                let hl = self.get_r16(&Reg16Symbol::HL);
                 let val = self.bus.read(hl as usize) | (1 << n);
                 self.bus.write(hl as usize, val);
                 12

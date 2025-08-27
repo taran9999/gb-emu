@@ -62,4 +62,5 @@ fn main() {
     for _ in 0..5 {
         cpu.step();
     }
+    println!("{}", cpu.export_state())
 }

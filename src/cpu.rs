@@ -235,6 +235,13 @@ impl CPU<'_> {
         }
     }
 
+    pub fn export_state(&self) -> String {
+        format!("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X}",
+        self.a.get(), self.f.to_u8(), self.b.get(), self.c.get(),
+        self.d.get(), self.e.get(), self.h.get(), self.l.get(),
+        self.sp, self.pc)
+    }
+
     fn fetch(&mut self) -> u8 {
         let byte = self.bus.read(self.pc as usize);
         self.pc += 1;

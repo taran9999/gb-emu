@@ -1076,11 +1076,73 @@ impl CPU<'_> {
                 12
             }
 
+            Instruction::LD_SP_HL => {
+                let val = self.get_r16(&Reg16Symbol::HL);
+                self.sp = val;
+                8
+            }
+
+            Instruction::LD_a16_A => {
+                let val = self.get_r8(&Reg8Symbol::A);
+                let addr = self.fetch_2();
+                self.bus.write(addr as usize, val);
+                16
+            }
+
+            Instruction::LD_A_a16 => {
+                let addr = self.fetch_2() as usize;
+                let val = self.bus.read(addr);
+                self.set_r8(&Reg8Symbol::A, val);
+                16
+            }
+
             Instruction::LD_HL_n8 => {
                 let value = self.fetch();
                 let address = self.get_r16(&Reg16Symbol::HL) as usize;
                 self.bus.write(address, value);
                 12
+            }
+
+            // NOTE: should this actually add to sp or no
+            Instruction::LD_HL_SP_e8 => {
+                self.execute(Instruction::ADD_SP_e8);
+                self.set_r16(&Reg16Symbol::HL, self.sp);
+                12
+            }
+
+            Instruction::LDH_n8_A => {
+                let ofs = self.fetch();
+                let addr = ofs as u16 + 0xFF00;
+                self.bus.write(addr as usize, self.get_r8(&Reg8Symbol::A));
+                12
+            }
+
+            Instruction::LDH_A_n8 => {
+                let ofs = self.fetch();
+                let addr = ofs as u16 + 0xFF00;
+                let val = self.bus.read(addr as usize);
+                self.set_r8(&Reg8Symbol::A, val);
+                12
+            }
+
+            Instruction::LDH_C_A => {
+                let mut addr: usize = 0xFF00;
+                if self.f.c {
+                    addr += 1
+                }
+                let val = self.get_r8(&Reg8Symbol::A);
+                self.bus.write(addr, val);
+                8
+            }
+
+            Instruction::LDH_A_C => {
+                let mut addr: usize = 0xFF00;
+                if self.f.c {
+                    addr += 1;
+                }
+                let val = self.bus.read(addr);
+                self.set_r8(&Reg8Symbol::A, val);
+                8
             }
 
             Instruction::INC_r16(r16s) => self.inc_r16(r16s),
@@ -1227,7 +1289,7 @@ impl CPU<'_> {
 
             Instruction::ADC_A_n8 => {
                 let carry = if self.f.c { 1 } else { 0 };
-                let val = self.fetch();
+                let val = self.fetch() + carry;
 
                 let res = self.sum_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
 
@@ -1293,7 +1355,7 @@ impl CPU<'_> {
 
             Instruction::SBC_A_n8 => {
                 let carry = if self.f.c { 1 } else { 0 };
-                let val = self.fetch();
+                let val = self.fetch() + carry;
 
                 let res = self.sub_u8_with_flags(self.get_r8(&Reg8Symbol::A), val);
 
@@ -1462,6 +1524,12 @@ impl CPU<'_> {
                 }
             }
 
+            Instruction::JP_HL => {
+                let val = self.get_r16(&Reg16Symbol::HL);
+                self.pc = val;
+                4
+            }
+
             Instruction::JR_n16 => {
                 let ofs = self.fetch() as i8;
                 let addr = self.fetch_2();
@@ -1498,6 +1566,8 @@ impl CPU<'_> {
                 20
             }
 
+            Instruction::RETI => todo!(),
+
             Instruction::PUSH_r16(r16s) => {
                 let val = self.get_r16(&r16s);
                 self.stack_push_u16(val);
@@ -1508,6 +1578,15 @@ impl CPU<'_> {
                 let val = self.stack_pop_u16();
                 self.set_r16(&r16s, val);
                 12
+            }
+
+            Instruction::PUSH_AF => {
+                let a = self.get_r8(&Reg8Symbol::A);
+                self.stack_push_u8(a);
+
+                let f = self.f.to_u8();
+                self.stack_push_u8(f << 4);
+                16
             }
 
             Instruction::POP_AF => {
@@ -1632,6 +1711,10 @@ impl CPU<'_> {
                 self.f.c = !self.f.c;
                 4
             }
+
+            Instruction::DI => todo!(),
+
+            Instruction::EI => todo!(),
 
             Instruction::STOP => {
                 todo!();
@@ -1852,8 +1935,6 @@ impl CPU<'_> {
             }
 
             Instruction::NotImplemented => 4,
-
-            _ => todo!(), // RETI, DI, EI
         }
     }
 

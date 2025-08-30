@@ -865,7 +865,12 @@ impl CPU<'_> {
                 20
             }
 
-            Instruction::RETI => todo!(),
+            Instruction::RETI => {
+                self.execute(Instruction::RET);
+                self.set_ime = false;
+                self.ime = true;
+                16
+            }
 
             Instruction::PUSH_r16(r16s) => {
                 let val = self.get_r16(&r16s);

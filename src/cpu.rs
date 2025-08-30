@@ -378,12 +378,6 @@ impl CPU<'_> {
                 20
             }
 
-            Instruction::LD_SP_n16 => {
-                let addr = self.fetch_2();
-                self.sp = addr;
-                12
-            }
-
             Instruction::LD_SP_HL => {
                 let val = self.get_r16(&Reg16Symbol::HL);
                 self.sp = val;
@@ -470,11 +464,6 @@ impl CPU<'_> {
                 4
             }
 
-            Instruction::INC_SP => {
-                self.sp = self.sp.wrapping_add(1);
-                8
-            }
-
             Instruction::DEC_r16(r16s) => self.dec_r16(r16s),
 
             Instruction::DEC_r8(r8s) => {
@@ -496,11 +485,6 @@ impl CPU<'_> {
                 4
             }
 
-            Instruction::DEC_SP => {
-                self.sp = self.sp.wrapping_sub(1);
-                8
-            }
-
             Instruction::ADD_HL_r16(r16s) => {
                 self.f.n = false;
 
@@ -509,16 +493,6 @@ impl CPU<'_> {
 
                 let res = self.sum_u16_with_flags(hl, r16_val);
 
-                self.set_r16(&Reg16Symbol::HL, res);
-                8
-            }
-
-            Instruction::ADD_HL_SP => {
-                self.f.n = false;
-
-                let hl = self.get_r16(&Reg16Symbol::HL);
-
-                let res = self.sum_u16_with_flags(hl, self.sp);
                 self.set_r16(&Reg16Symbol::HL, res);
                 8
             }

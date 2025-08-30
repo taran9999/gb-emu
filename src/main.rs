@@ -8,6 +8,7 @@ use cpu::CPU;
 mod bus;
 mod cart;
 mod cpu;
+mod instruction;
 
 fn main() {
     // read a directory for file selection

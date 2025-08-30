@@ -15,6 +15,7 @@ pub enum Reg16Symbol {
     HL,
     HLI,
     HLD,
+    SP,
 }
 
 pub enum FlagSymbol {

@@ -134,18 +134,25 @@ impl CPU<'_> {
     }
 
     fn get_r16(&self, sym: &Reg16Symbol) -> u16 {
+        if sym == &Reg16Symbol::SP {
+            return self.sp;
+        }
+
         let (high, low) = match sym {
             Reg16Symbol::BC => (self.get_r8(&Reg8Symbol::B), self.get_r8(&Reg8Symbol::C)),
             Reg16Symbol::DE => (self.get_r8(&Reg8Symbol::D), self.get_r8(&Reg8Symbol::E)),
             Reg16Symbol::HL | Reg16Symbol::HLI | Reg16Symbol::HLD => {
                 (self.get_r8(&Reg8Symbol::H), self.get_r8(&Reg8Symbol::L))
             }
+
+            // should not reach
+            Reg16Symbol::SP => (0, 0),
         };
 
         (high as u16) << 8 | low as u16
     }
 
-    fn set_r16(&self, sym: &Reg16Symbol, val: u16) {
+    fn set_r16(&mut self, sym: &Reg16Symbol, val: u16) {
         let (high, low) = ((val >> 8) as u8, val as u8);
 
         match sym {
@@ -163,6 +170,8 @@ impl CPU<'_> {
                 self.set_r8(&Reg8Symbol::H, high);
                 self.set_r8(&Reg8Symbol::L, low);
             }
+
+            Reg16Symbol::SP => self.sp = val,
         }
     }
 

@@ -1,5 +1,29 @@
+pub enum Reg8Symbol {
+    A,
+    B,
+    C,
+    D,
+    E,
+    H,
+    L,
+}
+
+#[derive(PartialEq, Eq)]
+pub enum Reg16Symbol {
+    BC,
+    DE,
+    HL,
+    HLI,
+    HLD,
+}
+
+pub enum FlagSymbol {
+    Z,
+    C,
+}
+
 #[allow(non_camel_case_types)]
-enum Instruction {
+pub enum Instruction {
     NOP,
 
     LD_r8_r8(Reg8Symbol, Reg8Symbol),

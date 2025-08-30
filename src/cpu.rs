@@ -215,6 +215,9 @@ pub struct CPU<'a> {
     f: Flags,
     sp: u16,
     pc: u16,
+    ime: bool,
+    set_ime: bool,
+    halted: bool,
     bus: &'a mut Bus<'a>,
 }
 
@@ -231,6 +234,9 @@ impl CPU<'_> {
             f: Flags::new(),
             sp: 0xFFFE,
             pc: 0x100,
+            ime: false,
+            set_ime: false,
+            halted: false,
             bus,
         }
     }
@@ -1719,16 +1725,24 @@ impl CPU<'_> {
                 4
             }
 
-            Instruction::DI => todo!(),
+            Instruction::DI => {
+                self.set_ime = false;
+                self.ime = false;
+                4
+            }
 
-            Instruction::EI => todo!(),
+            Instruction::EI => {
+                self.set_ime = true;
+                4
+            }
 
             Instruction::STOP => {
                 todo!();
             }
 
             Instruction::HALT => {
-                todo!();
+                self.halted = true;
+                4
             }
 
             Instruction::PREFIX => {
@@ -1946,8 +1960,26 @@ impl CPU<'_> {
     }
 
     pub fn step(&mut self) {
+        if self.halted {
+            return;
+        }
+
+        if self.set_ime {
+            self.set_ime = false;
+            self.ime = true;
+        }
+
         let opcode = self.fetch();
         let inst = self.decode(opcode);
         self.execute(inst);
+        self.handle_interrupt();
+    }
+
+    fn handle_interrupt(&mut self) -> u8 {
+        if !self.ime {
+            return 0;
+        }
+
+        20
     }
 }

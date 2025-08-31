@@ -314,11 +314,19 @@ impl CPU<'_> {
         }
     }
 
-    fn val_from_op8(&mut self, op: Op8) -> u8 {
+    fn val_from_op8(&mut self, op: &Op8) -> u8 {
         match op {
             Op8::Reg(r8s) => self.get_r8(&r8s),
             Op8::Addr(r16s) => self.bus.read(self.get_r16(&r16s) as usize),
             Op8::Byte => self.fetch(),
+        }
+    }
+
+    fn write_to_op8(&mut self, op: &Op8, val: u8) {
+        match op {
+            Op8::Reg(r8s) => self.set_r8(&r8s, val),
+            Op8::Addr(r16s) => self.bus.write(self.get_r16(&r16s) as usize, val),
+            Op8::Byte => panic!("Invalid instruction: can't write to Op8::Byte"),
         }
     }
 
@@ -506,7 +514,7 @@ impl CPU<'_> {
             }
 
             Instruction::ADD_A(op) => {
-                let val = self.val_from_op8(op);
+                let val = self.val_from_op8(&op);
                 let res = self.sum_u8_with_flags(self.a.get(), val);
                 self.a.set(res);
                 self.f.z = res == 0;
@@ -533,7 +541,7 @@ impl CPU<'_> {
 
             Instruction::ADC_A(op) => {
                 let carry = if self.f.c { 1 } else { 0 };
-                let mut val = self.val_from_op8(op);
+                let mut val = self.val_from_op8(&op);
                 val = val.wrapping_add(carry);
                 let res = self.sum_u8_with_flags(self.a.get(), val);
                 self.a.set(res);
@@ -543,7 +551,7 @@ impl CPU<'_> {
             }
 
             Instruction::SUB_A(op) => {
-                let val = self.val_from_op8(op);
+                let val = self.val_from_op8(&op);
                 let res = self.sub_u8_with_flags(self.a.get(), val);
                 self.a.set(res);
                 self.f.z = res == 0;
@@ -553,7 +561,7 @@ impl CPU<'_> {
 
             Instruction::SBC_A(op) => {
                 let carry = if self.f.c { 1 } else { 0 };
-                let mut val = self.val_from_op8(op);
+                let mut val = self.val_from_op8(&op);
                 val = val.wrapping_add(carry);
                 let res = self.sub_u8_with_flags(self.a.get(), val);
                 self.a.set(res);
@@ -563,7 +571,7 @@ impl CPU<'_> {
             }
 
             Instruction::AND_A(op) => {
-                let val = self.val_from_op8(op);
+                let val = self.val_from_op8(&op);
                 let res = self.a.get() & val;
                 self.a.set(res);
                 self.f.z = res == 0;
@@ -574,7 +582,7 @@ impl CPU<'_> {
             }
 
             Instruction::XOR_A(op) => {
-                let val = self.val_from_op8(op);
+                let val = self.val_from_op8(&op);
                 let res = self.a.get() ^ val;
                 self.a.set(res);
                 self.f.z = res == 0;
@@ -585,7 +593,7 @@ impl CPU<'_> {
             }
 
             Instruction::OR_A(op) => {
-                let val = self.val_from_op8(op);
+                let val = self.val_from_op8(&op);
                 let res = self.a.get() | val;
                 self.a.set(res);
                 self.f.z = res == 0;
@@ -596,7 +604,7 @@ impl CPU<'_> {
             }
 
             Instruction::CP_A(op) => {
-                let val = self.val_from_op8(op);
+                let val = self.val_from_op8(&op);
                 let res = self.sub_u8_with_flags(self.a.get(), val);
                 self.f.z = res == 0;
                 self.f.n = false;
@@ -839,122 +847,78 @@ impl CPU<'_> {
                 4 + self.execute(inst)
             }
 
-            Instruction::RLC(r8s) => {
-                let val = self.get_r8(&r8s);
-                let new = self.u8_rot_left(val);
-                self.set_r8(&r8s, new);
+            Instruction::RL(op, cir) => {
+                let val = self.val_from_op8(&op);
+
+                let new = if cir {
+                    self.u8_rot_left(val)
+                } else {
+                    self.u8_rot_left_through_carry(val)
+                };
+
                 self.f.z = new == 0;
-                8
+                self.write_to_op8(&op, new);
+
+                match op {
+                    Op8::Reg(_) => 8,
+                    Op8::Addr(_) => 12,
+                    Op8::Byte => panic!(),
+                }
             }
 
-            Instruction::RLC_HL => {
-                let hl = self.get_r16(&Reg16Symbol::HL);
-                let val = self.bus.read(hl as usize);
-                let new = self.u8_rot_left(val);
-                self.bus.write(hl as usize, new);
+            Instruction::RR(op, cir) => {
+                let val = self.val_from_op8(&op);
+
+                let new = if cir {
+                    self.u8_rot_right(val)
+                } else {
+                    self.u8_rot_right_through_carry(val)
+                };
+
                 self.f.z = new == 0;
-                12
+                self.write_to_op8(&op, new);
+
+                match op {
+                    Op8::Reg(_) => 8,
+                    Op8::Addr(_) => 12,
+                    Op8::Byte => panic!(),
+                }
             }
 
-            Instruction::RL(r8s) => {
-                let val = self.get_r8(&r8s);
-                let new = self.u8_rot_left_through_carry(val);
-                self.set_r8(&r8s, new);
-                self.f.z = new == 0;
-                8
-            }
-
-            Instruction::RL_HL => {
-                let hl = self.get_r16(&Reg16Symbol::HL);
-                let val = self.bus.read(hl as usize);
-                let new = self.u8_rot_left_through_carry(val);
-                self.bus.write(hl as usize, new);
-                self.f.z = new == 0;
-                12
-            }
-
-            Instruction::RRC(r8s) => {
-                let val = self.get_r8(&r8s);
-                let new = self.u8_rot_right(val);
-                self.set_r8(&r8s, new);
-                self.f.z = new == 0;
-                8
-            }
-
-            Instruction::RRC_HL => {
-                let hl = self.get_r16(&Reg16Symbol::HL);
-                let val = self.bus.read(hl as usize);
-                let new = self.u8_rot_right(val);
-                self.bus.write(hl as usize, new);
-                self.f.z = new == 0;
-                12
-            }
-
-            Instruction::RR(r8s) => {
-                let val = self.get_r8(&r8s);
-                let new = self.u8_rot_right_through_carry(val);
-                self.set_r8(&r8s, new);
-                self.f.z = new == 0;
-                8
-            }
-
-            Instruction::RR_HL => {
-                let hl = self.get_r16(&Reg16Symbol::HL);
-                let val = self.bus.read(hl as usize);
-                let new = self.u8_rot_right_through_carry(val);
-                self.bus.write(hl as usize, new);
-                self.f.z = new == 0;
-                12
-            }
-
-            Instruction::SLA(r8s) => {
-                let val = self.get_r8(&r8s);
-                self.f.c = val & 0b1000_0000 == 1;
+            Instruction::SLA(op) => {
+                let val = self.val_from_op8(&op);
+                self.f.c = val & 128 == 128;
                 let new = val << 1;
                 self.f.z = new == 0;
                 self.f.n = false;
                 self.f.h = false;
-                self.set_r8(&r8s, new);
-                8
+                self.write_to_op8(&op, new);
+
+                match op {
+                    Op8::Reg(_) => 8,
+                    Op8::Addr(_) => 12,
+                    Op8::Byte => panic!(),
+                }
             }
 
-            Instruction::SLA_HL => {
-                let hl = self.get_r16(&Reg16Symbol::HL);
-                let val = self.bus.read(hl as usize);
-                self.f.c = val & 0b1000_0000 == 1;
-                let new = val << 1;
-                self.bus.write(hl as usize, new);
-                self.f.z = new == 0;
-                self.f.n = false;
-                self.f.h = false;
-                12
-            }
-
-            Instruction::SRA(r8s) => {
-                let val = self.get_r8(&r8s);
+            Instruction::SRA(op) => {
+                let val = self.val_from_op8(&op);
                 self.f.c = val & 1 == 1;
                 let new = val >> 1;
                 self.f.z = new == 0;
                 self.f.n = false;
                 self.f.h = false;
-                self.set_r8(&r8s, new);
-                8
+                self.write_to_op8(&op, new);
+
+                match op {
+                    Op8::Reg(_) => 8,
+                    Op8::Addr(_) => 12,
+                    Op8::Byte => panic!(),
+                }
             }
 
-            Instruction::SRA_HL => {
-                let hl = self.get_r16(&Reg16Symbol::HL);
-                let val = self.bus.read(hl as usize);
-                self.f.c = val & 1 == 1;
-                let new = val >> 1;
-                self.bus.write(hl as usize, new);
-                self.f.z = new == 0;
-                self.f.n = false;
-                self.f.h = false;
-                12
-            }
-
-            Instruction::SWAP(r8s) => {
-                let val = self.get_r8(&r8s);
+            Instruction::SWAP(op) => {
+                let val = self.val_from_op8(&op);
                 let high = val & 0xF0;
                 let low = val & 0x0F;
                 let new = (low << 4) | high;
@@ -962,41 +926,29 @@ impl CPU<'_> {
                 self.f.n = false;
                 self.f.h = false;
                 self.f.c = false;
-                self.set_r8(&r8s, new);
-                8
+                self.write_to_op8(&op, new);
+
+                match op {
+                    Op8::Reg(_) => 8,
+                    Op8::Addr(_) => 16,
+                    Op8::Byte => panic!(),
+                }
             }
 
-            Instruction::SWAP_HL => {
-                let hl = self.get_r16(&Reg16Symbol::HL);
-                let val = self.bus.read(hl as usize);
-                let high = val & 0xF0;
-                let low = val & 0x0F;
-                let new = (low << 4) | high;
-                self.bus.write(hl as usize, new);
-                16
-            }
-
-            Instruction::SRL(r8s) => {
-                let val = self.get_r8(&r8s);
+            Instruction::SRL(op) => {
+                let val = self.val_from_op8(&op);
                 self.f.c = val & 1 == 1;
                 let new = val >> 1;
                 self.f.z = val == 0;
                 self.f.n = false;
                 self.f.h = false;
-                self.set_r8(&r8s, new);
-                8
-            }
+                self.write_to_op8(&op, new);
 
-            Instruction::SRL_HL => {
-                let hl = self.get_r16(&Reg16Symbol::HL);
-                let val = self.bus.read(hl as usize);
-                self.f.c = val & 1 == 1;
-                let new = val >> 1;
-                self.bus.write(hl as usize, new);
-                self.f.z = new == 0;
-                self.f.n = false;
-                self.f.h = false;
-                12
+                match op {
+                    Op8::Reg(_) => 8,
+                    Op8::Addr(_) => 12,
+                    Op8::Byte => panic!(),
+                }
             }
 
             Instruction::BIT(n, r8s) => {

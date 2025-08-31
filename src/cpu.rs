@@ -951,48 +951,42 @@ impl CPU<'_> {
                 }
             }
 
-            Instruction::BIT(n, r8s) => {
-                let reg = self.get_r8(&r8s);
-                let val = reg >> n;
+            Instruction::BIT(n, op) => {
+                let mut val = self.val_from_op8(&op);
+                val = val >> n;
                 self.f.z = val & 1 == 0;
                 self.f.n = false;
                 self.f.h = true;
-                8
+
+                match op {
+                    Op8::Reg(_) => 8,
+                    Op8::Addr(_) => 12,
+                    Op8::Byte => panic!(),
+                }
             }
 
-            Instruction::BIT_HL(n) => {
-                let hl = self.get_r16(&Reg16Symbol::HL);
-                let val = self.bus.read(hl as usize) >> n;
-                self.f.c = val & 1 == 0;
-                self.f.n = false;
-                self.f.h = true;
-                12
+            Instruction::RES(n, op) => {
+                let val = self.val_from_op8(&op);
+                let new = val & !(1 << n);
+                self.write_to_op8(&op, new);
+
+                match op {
+                    Op8::Reg(_) => 8,
+                    Op8::Addr(_) => 12,
+                    Op8::Byte => panic!(),
+                }
             }
 
-            Instruction::RES(n, r8s) => {
-                let reg = self.get_r8(&r8s);
-                self.set_r8(&r8s, reg & !(1 << n));
-                8
-            }
+            Instruction::SET(n, op) => {
+                let val = self.val_from_op8(&op);
+                let new = val | (1 << n);
+                self.write_to_op8(&op, new);
 
-            Instruction::RES_HL(n) => {
-                let hl = self.get_r16(&Reg16Symbol::HL);
-                let val = self.bus.read(hl as usize) & !(1 << n);
-                self.bus.write(hl as usize, val);
-                12
-            }
-
-            Instruction::SET(n, r8s) => {
-                let reg = self.get_r8(&r8s);
-                self.set_r8(&r8s, reg | (1 << n));
-                8
-            }
-
-            Instruction::SET_HL(n) => {
-                let hl = self.get_r16(&Reg16Symbol::HL);
-                let val = self.bus.read(hl as usize) | (1 << n);
-                self.bus.write(hl as usize, val);
-                12
+                match op {
+                    Op8::Reg(_) => 8,
+                    Op8::Addr(_) => 12,
+                    Op8::Byte => panic!(),
+                }
             }
 
             Instruction::NotImplemented => 4,

@@ -26,29 +26,44 @@ pub enum FlagSymbol {
 // operand sources for instructions types for which a u8 can be retrieved
 pub enum Op8 {
     Reg(Reg8Symbol),
-    Addr(Reg16Symbol), // bus read with address set to the value in r16
-    Byte,              // fetch a byte
+    Addr(Reg16Symbol), // bus read/write with address set to the value in r16
+    Byte,              // fetch a byte (cannot be used for writing)
+    AddrBytes,         // bus read/write with address determined by fetching 2 bytes
+    HighByte,          // fetch a byte, add to 0xFF00, use that address
+    C,                 // add carry flag to 0xFF00, use that address
+}
+
+pub enum Op16 {
+    Reg(Reg16Symbol),
+    Bytes,
 }
 
 #[allow(non_camel_case_types)]
 pub enum Instruction {
     NOP,
 
-    LD_r8_r8(Reg8Symbol, Reg8Symbol),
-    LD_r8_n8(Reg8Symbol),
-    LD_r8_r16(Reg8Symbol, Reg16Symbol),
-    LD_r16_r8(Reg16Symbol, Reg8Symbol),
-    LD_r16_n16(Reg16Symbol),
+    // dst, src
+    LD_8_8(Op8, Op8),
+    LD_16_16(Op16, Op16),
+
+    // 8 8
+    // LD_r8_r8(Reg8Symbol, Reg8Symbol), -- Reg Reg T=4
+    // LD_r8_n8(Reg8Symbol), -- Reg Byte T=8
+    // LD_r8_r16(Reg8Symbol, Reg16Symbol), -- Reg Addr T=8
+    // LD_r16_r8(Reg16Symbol, Reg8Symbol), -- Addr Reg T=8
+    // LD_a16_A, -- AddrBytes Reg(A) T=16
+    // LD_A_a16, -- Reg(A) AddrBytes T=16
+    // LD_HL_n8, -- Addr(HL) Byte T=12
+    // LDH_n8_A, -- HighByte Reg(A) T=12
+    // LDH_A_n8, -- Reg(A) HighByte T=12
+    // LDH_C_A, -- C Reg(A) T=8
+    // LDH_A_C, -- Reg(A) C T=8
+
+    // 16 16
+    // LD_r16_n16(Reg16Symbol), -- Reg Bytes T=12
+    // LD_SP_HL, -- Reg(SP) Reg(HL) T=8
     LD_a16_SP,
-    LD_SP_HL,
-    LD_a16_A,
-    LD_A_a16,
-    LD_HL_n8,
     LD_HL_SP_e8,
-    LDH_n8_A,
-    LDH_A_n8,
-    LDH_C_A,
-    LDH_A_C,
 
     INC_r16(Reg16Symbol),
     INC_r8(Reg8Symbol),

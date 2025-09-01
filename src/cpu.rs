@@ -1,7 +1,7 @@
 use std::cell::Cell;
 
 use crate::bus::Bus;
-use crate::instruction::{FlagSymbol, Instruction, Op8, Reg16Symbol, Reg8Symbol};
+use crate::instruction::{FlagSymbol, Instruction, Op16, Op8, Reg16Symbol, Reg8Symbol};
 
 // #[cfg(test)]
 // mod tests;
@@ -133,7 +133,7 @@ impl CPU<'_> {
         }
     }
 
-    fn get_r16(&self, sym: &Reg16Symbol) -> u16 {
+    fn get_r16(&mut self, sym: &Reg16Symbol) -> u16 {
         if sym == &Reg16Symbol::SP {
             return self.sp;
         }
@@ -141,7 +141,15 @@ impl CPU<'_> {
         let (high, low) = match sym {
             Reg16Symbol::BC => (self.get_r8(&Reg8Symbol::B), self.get_r8(&Reg8Symbol::C)),
             Reg16Symbol::DE => (self.get_r8(&Reg8Symbol::D), self.get_r8(&Reg8Symbol::E)),
-            Reg16Symbol::HL | Reg16Symbol::HLI | Reg16Symbol::HLD => {
+            Reg16Symbol::HL => (self.get_r8(&Reg8Symbol::H), self.get_r8(&Reg8Symbol::L)),
+
+            Reg16Symbol::HLI => {
+                self.inc_r16(Reg16Symbol::HL);
+                (self.get_r8(&Reg8Symbol::H), self.get_r8(&Reg8Symbol::L))
+            }
+
+            Reg16Symbol::HLD => {
+                self.inc_r16(Reg16Symbol::HL);
                 (self.get_r8(&Reg8Symbol::H), self.get_r8(&Reg8Symbol::L))
             }
 
@@ -317,16 +325,82 @@ impl CPU<'_> {
     fn val_from_op8(&mut self, op: &Op8) -> u8 {
         match op {
             Op8::Reg(r8s) => self.get_r8(&r8s),
-            Op8::Addr(r16s) => self.bus.read(self.get_r16(&r16s) as usize),
+
+            Op8::Addr(r16s) => {
+                let val = self.get_r16(&r16s);
+                self.bus.read(val as usize)
+            }
+
             Op8::Byte => self.fetch(),
+
+            Op8::AddrBytes => {
+                let addr = self.fetch_2();
+                self.bus.read(addr as usize)
+            }
+
+            Op8::HighByte => {
+                let ofs = self.fetch() as u16;
+                let addr = ofs + 0xFF00;
+                self.bus.read(addr as usize)
+            }
+
+            Op8::C => {
+                let mut addr = 0xFF00;
+
+                if self.f.c {
+                    addr += 1;
+                }
+
+                self.bus.read(addr as usize)
+            }
         }
     }
 
     fn write_to_op8(&mut self, op: &Op8, val: u8) {
         match op {
             Op8::Reg(r8s) => self.set_r8(&r8s, val),
-            Op8::Addr(r16s) => self.bus.write(self.get_r16(&r16s) as usize, val),
+
+            Op8::Addr(r16s) => {
+                let rval = self.get_r16(&r16s);
+                self.bus.write(rval as usize, val)
+            }
+
             Op8::Byte => panic!("Invalid instruction: can't write to Op8::Byte"),
+
+            Op8::AddrBytes => {
+                let addr = self.fetch_2();
+                self.bus.write(addr as usize, val)
+            }
+
+            Op8::HighByte => {
+                let ofs = self.fetch() as u16;
+                let addr = ofs + 0xFF00;
+                self.bus.write(addr as usize, val)
+            }
+
+            Op8::C => {
+                let mut addr = 0xFF00;
+
+                if self.f.c {
+                    addr += 1;
+                }
+
+                self.bus.write(addr as usize, val);
+            }
+        }
+    }
+
+    fn val_from_op16(&mut self, op: &Op16) -> u16 {
+        match op {
+            Op16::Reg(r16s) => self.get_r16(&r16s),
+            Op16::Bytes => self.fetch_2(),
+        }
+    }
+
+    fn write_to_op16(&mut self, op: &Op16, val: u16) {
+        match op {
+            Op16::Reg(r16s) => self.set_r16(&r16s, val),
+            Op16::Bytes => panic!("Invalid instruction: can't write to Op16::Bytes"),
         }
     }
 
@@ -336,6 +410,24 @@ impl CPU<'_> {
     fn execute(&mut self, inst: Instruction) -> u8 {
         match inst {
             Instruction::NOP => 4,
+
+            Instruction::LD_8_8(dst, src) => {
+                let val = self.val_from_op8(&src);
+                self.write_to_op8(&dst, val);
+
+                // LD r8 r8
+                if let (Op8::Reg(_), Op8::Reg(_)) = (dst, src) {
+                    return 4;
+                }
+
+                8
+            }
+
+            Instruction::LD_16_16(dst, src) => {
+                let val = self.val_from_op16(&src);
+                self.write_to_op16(&dst, val);
+                12
+            }
 
             Instruction::LD_r8_r8(r8s1, r8s2) => {
                 // copy value at r82 to r81

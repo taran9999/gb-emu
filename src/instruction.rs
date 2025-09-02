@@ -105,8 +105,8 @@ pub enum Instruction {
     RETI,
     PUSH_r16(Reg16Symbol),
     POP_r16(Reg16Symbol),
-    // PUSH_AF,
-    // POP_AF,
+    PUSH_AF,
+    POP_AF,
     CALL(Condition),
     // CALL_n16, T=24
     // CALL_n16_Conditional(FlagSymbol, bool), T=24/12

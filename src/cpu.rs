@@ -1,7 +1,7 @@
 use std::cell::Cell;
 
 use crate::bus::Bus;
-use crate::instruction::{FlagSymbol, Instruction, Op16, Op8, Reg16Symbol, Reg8Symbol};
+use crate::instruction::{Condition, FlagSymbol, Instruction, Op16, Op8, Reg16Symbol, Reg8Symbol};
 
 // #[cfg(test)]
 // mod tests;
@@ -404,6 +404,16 @@ impl CPU<'_> {
         }
     }
 
+    fn check_cond(&self, c: &Condition) -> bool {
+        match c {
+            Condition::None => true,
+            Condition::C => self.f.c,
+            Condition::Z => self.f.z,
+            Condition::NC => !self.f.c,
+            Condition::NZ => !self.f.z,
+        }
+    }
+
     // Instructions take a variable amount of CPU cycles
     // from https://emudev.de/gameboy-emulator/opcode-cycles-and-timings/ return the number of
     // cycles executed to develop accurate timing. Yields number of T-states.
@@ -703,6 +713,18 @@ impl CPU<'_> {
                 4
             }
 
+            Instruction::JP(cond, src) => {
+                let addr = self.val_from_op16(&src);
+                let cond = self.check_cond(&cond);
+                // TODO: setting pc takes T-states, unless addr is from another register (HL)
+                // probably make r16 symbol for PC and prefer to use set_r16 where it can check
+                // source
+                if cond {
+                    self.pc = addr;
+                }
+                0
+            }
+
             Instruction::JP_n16 => {
                 let addr = self.fetch_2();
                 self.pc = addr;
@@ -726,6 +748,17 @@ impl CPU<'_> {
                 4
             }
 
+            Instruction::JR(cond) => {
+                let ofs = self.fetch() as i8;
+                let cond = self.check_cond(&cond);
+                if cond {
+                    // TODO: although just adding to PC, this requires 4 T-states. Prob just
+                    // manually set
+                    self.pc = self.pc.wrapping_add_signed(ofs.into()) + 2;
+                }
+                0
+            }
+
             Instruction::JR_n16 => {
                 let ofs = self.fetch() as i8;
                 let addr = self.fetch_2();
@@ -743,6 +776,17 @@ impl CPU<'_> {
                 } else {
                     8
                 }
+            }
+
+            Instruction::RET(cond) => {
+                // TODO: why extra M cycle for conditional (20/8 instead of 16/4)
+                // why is RET and RETI 16 but RET cond taken is 20
+                let cond = self.check_cond(&cond);
+                if cond {
+                    let val = self.stack_pop_u16();
+                    self.pc = val;
+                }
+                0
             }
 
             Instruction::RET => {
@@ -763,7 +807,7 @@ impl CPU<'_> {
             }
 
             Instruction::RETI => {
-                self.execute(Instruction::RET);
+                self.execute(Instruction::RET(Condition::None));
                 self.set_ime = false;
                 self.ime = true;
                 16

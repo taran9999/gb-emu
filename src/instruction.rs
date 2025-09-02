@@ -38,6 +38,14 @@ pub enum Op16 {
     Bytes,
 }
 
+pub enum Condition {
+    None,
+    C,
+    Z,
+    NC,
+    NZ,
+}
+
 #[allow(non_camel_case_types)]
 pub enum Instruction {
     NOP,
@@ -83,24 +91,25 @@ pub enum Instruction {
     OR_A(Op8),
     CP_A(Op8),
 
-    JP_n16,
-    JP_n16_Conditional(FlagSymbol, bool),
-    JP_HL,
-
-    JR_n16,
-    JR_n16_Conditional(FlagSymbol, bool),
-
-    RET,
-    RET_Conditional(FlagSymbol, bool),
+    // condition, addr source
+    JP(Condition, Op16),
+    // JP_n16, -- None Bytes T=16
+    // JP_n16_Conditional, -- [] Bytes T=16/12
+    // JP_HL, -- None Reg(HL) T=4
+    JR(Condition),
+    // JR_n16, -- None T=12
+    // JR_n16_Conditional(FlagSymbol, bool), -- [] T=12/8
+    RET(Condition),
+    // RET, T=16
+    // RET_Conditional(FlagSymbol, bool), T=20/8
     RETI,
-
     PUSH_r16(Reg16Symbol),
     POP_r16(Reg16Symbol),
-    PUSH_AF,
-    POP_AF,
-
-    CALL_n16,
-    CALL_n16_Conditional(FlagSymbol, bool),
+    // PUSH_AF,
+    // POP_AF,
+    CALL(Condition),
+    // CALL_n16, T=24
+    // CALL_n16_Conditional(FlagSymbol, bool), T=24/12
     RST(u16),
 
     RLCA,

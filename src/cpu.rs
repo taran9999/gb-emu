@@ -69,6 +69,16 @@ pub struct CPU<'a> {
     bus: &'a mut Bus<'a>,
 }
 
+/*
+* Timing: add M-cycles for the following actions
+* Fetch byte: 1
+* Stack push u8: 2 (data bus waits for IDU to decrement SP first)
+* Stack push u16: 3 (the second SP decrement is done concurrently with the first bus write)
+* Stack pop u8: 1
+* Set PC from bytes/signed offset: 1 (can only set on the cycle after both bytes are fetched)
+* Set PC from HL: 0
+* Bus read/write: 1
+*/
 impl CPU<'_> {
     pub fn init<'a>(bus: &'a mut Bus<'a>) -> CPU<'a> {
         CPU {
@@ -96,17 +106,26 @@ impl CPU<'_> {
         self.sp, self.pc)
     }
 
-    fn fetch(&mut self) -> u8 {
-        let byte = self.bus.read(self.pc as usize);
+    fn bus_read(&self, addr: usize) -> (u8, u8) {
+        (self.bus.read(addr), 1)
+    }
+
+    fn bus_write(&mut self, addr: usize, val: u8) -> u8 {
+        self.bus.write(addr, val);
+        1
+    }
+
+    fn fetch(&mut self) -> (u8, u8) {
+        let (byte, _) = self.bus_read(self.pc as usize);
         self.pc += 1;
-        byte
+        (byte, 1)
     }
 
     // fetch two bytes and return a u16 (little endian)
-    fn fetch_2(&mut self) -> u16 {
-        let low = self.fetch() as u16;
-        let high = self.fetch() as u16;
-        (high << 8) | low
+    fn fetch_2(&mut self) -> (u16, u8) {
+        let low = self.fetch().0 as u16;
+        let high = self.fetch().0 as u16;
+        ((high << 8) | low, 2)
     }
 
     fn get_r8(&self, sym: &Reg8Symbol) -> u8 {
@@ -143,13 +162,14 @@ impl CPU<'_> {
             Reg16Symbol::DE => (self.get_r8(&Reg8Symbol::D), self.get_r8(&Reg8Symbol::E)),
             Reg16Symbol::HL => (self.get_r8(&Reg8Symbol::H), self.get_r8(&Reg8Symbol::L)),
 
+            // don't count additional m cycle for inc/dec as IDU does it concurrently with mem read
             Reg16Symbol::HLI => {
                 self.inc_r16(Reg16Symbol::HL);
                 (self.get_r8(&Reg8Symbol::H), self.get_r8(&Reg8Symbol::L))
             }
 
             Reg16Symbol::HLD => {
-                self.inc_r16(Reg16Symbol::HL);
+                self.dec_r16(Reg16Symbol::HL);
                 (self.get_r8(&Reg8Symbol::H), self.get_r8(&Reg8Symbol::L))
             }
 
@@ -184,13 +204,15 @@ impl CPU<'_> {
     }
 
     fn inc_r16(&mut self, r16s: Reg16Symbol) -> u8 {
-        self.set_r16(&r16s, self.get_r16(&r16s).wrapping_add(1));
-        8
+        let curr = self.get_r16(&r16s);
+        self.set_r16(&r16s, curr.wrapping_add(1));
+        1
     }
 
     fn dec_r16(&mut self, r16s: Reg16Symbol) -> u8 {
-        self.set_r16(&r16s, self.get_r16(&r16s).wrapping_sub(1));
-        8
+        let curr = self.get_r16(&r16s);
+        self.set_r16(&r16s, curr.wrapping_sub(1));
+        1
     }
 
     fn sum_u16_with_flags(&mut self, n1: u16, n2: u16) -> u16 {
@@ -227,28 +249,30 @@ impl CPU<'_> {
         res
     }
 
-    fn stack_push_u8(&mut self, val: u8) {
+    fn stack_push_u8(&mut self, val: u8) -> u8 {
         self.sp = self.sp.wrapping_sub(1);
         self.bus.write(self.sp as usize, val);
+        2
     }
 
-    fn stack_push_u16(&mut self, val: u16) {
+    fn stack_push_u16(&mut self, val: u16) -> u8 {
         let low = val as u8;
         let high = (val >> 8) as u8;
         self.stack_push_u8(high);
         self.stack_push_u8(low);
+        3
     }
 
-    fn stack_pop_u8(&mut self) -> u8 {
-        let val = self.bus.read(self.sp as usize);
+    fn stack_pop_u8(&mut self) -> (u8, u8) {
+        let (val, _) = self.bus_read(self.sp as usize);
         self.sp = self.sp.wrapping_add(1);
-        val
+        (val, 1)
     }
 
-    fn stack_pop_u16(&mut self) -> u16 {
-        let low = self.stack_pop_u8();
-        let high = self.stack_pop_u8();
-        (high as u16) << 8 | low as u16
+    fn stack_pop_u16(&mut self) -> (u16, u8) {
+        let (low, _) = self.stack_pop_u8();
+        let (high, _) = self.stack_pop_u8();
+        ((high as u16) << 8 | low as u16, 2)
     }
 
     fn u8_rot_left(&mut self, val: u8) -> u8 {
@@ -322,26 +346,29 @@ impl CPU<'_> {
         }
     }
 
-    fn val_from_op8(&mut self, op: &Op8) -> u8 {
+    fn val_from_op8(&mut self, op: &Op8) -> (u8, u8) {
         match op {
-            Op8::Reg(r8s) => self.get_r8(&r8s),
+            Op8::Reg(r8s) => (self.get_r8(&r8s), 0),
 
             Op8::Addr(r16s) => {
                 let val = self.get_r16(&r16s);
-                self.bus.read(val as usize)
+                self.bus_read(val as usize)
             }
 
             Op8::Byte => self.fetch(),
 
             Op8::AddrBytes => {
-                let addr = self.fetch_2();
-                self.bus.read(addr as usize)
+                let (addr, c) = self.fetch_2();
+                let (byte, c2) = self.bus_read(addr as usize);
+                (byte, c + c2)
             }
 
             Op8::HighByte => {
-                let ofs = self.fetch() as u16;
-                let addr = ofs + 0xFF00;
-                self.bus.read(addr as usize)
+                let (ofs, c) = self.fetch();
+                let ofs_u16 = ofs as u16;
+                let addr = ofs_u16 + 0xFF00;
+                let (byte, c2) = self.bus_read(addr as usize);
+                (byte, c + c2)
             }
 
             Op8::C => {
@@ -351,31 +378,35 @@ impl CPU<'_> {
                     addr += 1;
                 }
 
-                self.bus.read(addr as usize)
+                self.bus_read(addr as usize)
             }
         }
     }
 
-    fn write_to_op8(&mut self, op: &Op8, val: u8) {
+    fn write_to_op8(&mut self, op: &Op8, val: u8) -> u8 {
         match op {
-            Op8::Reg(r8s) => self.set_r8(&r8s, val),
+            Op8::Reg(r8s) => {
+                self.set_r8(&r8s, val);
+                0
+            }
 
             Op8::Addr(r16s) => {
                 let rval = self.get_r16(&r16s);
-                self.bus.write(rval as usize, val)
+                self.bus_write(rval as usize, val)
             }
 
             Op8::Byte => panic!("Invalid instruction: can't write to Op8::Byte"),
 
             Op8::AddrBytes => {
-                let addr = self.fetch_2();
-                self.bus.write(addr as usize, val)
+                let (addr, c) = self.fetch_2();
+                c + self.bus_write(addr as usize, val)
             }
 
             Op8::HighByte => {
-                let ofs = self.fetch() as u16;
-                let addr = ofs + 0xFF00;
-                self.bus.write(addr as usize, val)
+                let (ofs, c) = self.fetch();
+                let ofs_u16 = ofs as u16;
+                let addr = ofs_u16 + 0xFF00;
+                c + self.bus_write(addr as usize, val)
             }
 
             Op8::C => {
@@ -385,14 +416,14 @@ impl CPU<'_> {
                     addr += 1;
                 }
 
-                self.bus.write(addr as usize, val);
+                self.bus_write(addr as usize, val)
             }
         }
     }
 
-    fn val_from_op16(&mut self, op: &Op16) -> u16 {
+    fn val_from_op16(&mut self, op: &Op16) -> (u16, u8) {
         match op {
-            Op16::Reg(r16s) => self.get_r16(&r16s),
+            Op16::Reg(r16s) => (self.get_r16(&r16s), 0),
             Op16::Bytes => self.fetch_2(),
         }
     }
@@ -416,27 +447,20 @@ impl CPU<'_> {
 
     // Instructions take a variable amount of CPU cycles
     // from https://emudev.de/gameboy-emulator/opcode-cycles-and-timings/ return the number of
-    // cycles executed to develop accurate timing. Yields number of T-states.
+    // cycles executed to develop accurate timing. Yields number of M-cycles.
     fn execute(&mut self, inst: Instruction) -> u8 {
         match inst {
-            Instruction::NOP => 4,
+            Instruction::NOP => 1,
 
             Instruction::LD_8_8(dst, src) => {
-                let val = self.val_from_op8(&src);
-                self.write_to_op8(&dst, val);
-
-                // LD r8 r8
-                if let (Op8::Reg(_), Op8::Reg(_)) = (dst, src) {
-                    return 4;
-                }
-
-                8
+                let (val, cycles) = self.val_from_op8(&src);
+                cycles + self.write_to_op8(&dst, val)
             }
 
             Instruction::LD_16_16(dst, src) => {
-                let val = self.val_from_op16(&src);
+                let (val, cycles) = self.val_from_op16(&src);
                 self.write_to_op16(&dst, val);
-                12
+                cycles
             }
 
             // Instruction::LD_r8_r8(r8s1, r8s2) => {
@@ -487,12 +511,12 @@ impl CPU<'_> {
             //     12
             // }
             Instruction::LD_a16_SP => {
-                let addr = self.fetch_2();
+                let (addr, _) = self.fetch_2();
 
                 // write SP & 0xFF (low byte) to addr, and SP >> 8 (high byte) to addr + 1
-                self.bus.write(addr as usize, (self.sp & 0xFF) as u8);
-                self.bus.write((addr + 1) as usize, (self.sp >> 8) as u8);
-                20
+                self.bus_write(addr as usize, (self.sp & 0xFF) as u8);
+                self.bus_write((addr + 1) as usize, (self.sp >> 8) as u8);
+                4
             }
 
             // Instruction::LD_SP_HL => {
@@ -526,7 +550,7 @@ impl CPU<'_> {
             Instruction::LD_HL_SP_e8 => {
                 self.execute(Instruction::ADD_SP_e8);
                 self.set_r16(&Reg16Symbol::HL, self.sp);
-                12
+                2
             }
 
             // Instruction::LDH_n8_A => {
@@ -577,7 +601,7 @@ impl CPU<'_> {
                 self.f.z = new_val == 0;
 
                 self.set_r8(&r8s, new_val);
-                4
+                0
             }
 
             Instruction::DEC_r16(r16s) => self.dec_r16(r16s),
@@ -598,7 +622,7 @@ impl CPU<'_> {
                 }
 
                 self.set_r8(&r8s, new_val);
-                4
+                0
             }
 
             Instruction::ADD_HL_r16(r16s) => {
@@ -610,20 +634,20 @@ impl CPU<'_> {
                 let res = self.sum_u16_with_flags(hl, r16_val);
 
                 self.set_r16(&Reg16Symbol::HL, res);
-                8
+                1
             }
 
             Instruction::ADD_A(op) => {
-                let val = self.val_from_op8(&op);
+                let (val, cycles) = self.val_from_op8(&op);
                 let res = self.sum_u8_with_flags(self.a.get(), val);
                 self.a.set(res);
                 self.f.z = res == 0;
                 self.f.n = false;
-                4
+                cycles
             }
 
             Instruction::ADD_SP_e8 => {
-                let ofs = self.fetch();
+                let (ofs, _) = self.fetch();
                 let ofs_signed = ofs as i8;
                 let ofs_u16 = ofs_signed as u16;
 
@@ -636,91 +660,92 @@ impl CPU<'_> {
 
                 self.f.z = self.sp == 0;
                 self.f.n = false;
-                16
+                3
             }
 
             Instruction::ADC_A(op) => {
                 let carry = if self.f.c { 1 } else { 0 };
-                let mut val = self.val_from_op8(&op);
+                let (mut val, cycles) = self.val_from_op8(&op);
                 val = val.wrapping_add(carry);
                 let res = self.sum_u8_with_flags(self.a.get(), val);
                 self.a.set(res);
                 self.f.z = res == 0;
                 self.f.n = false;
-                4
+                cycles
             }
 
             Instruction::SUB_A(op) => {
-                let val = self.val_from_op8(&op);
+                let (val, cycles) = self.val_from_op8(&op);
                 let res = self.sub_u8_with_flags(self.a.get(), val);
                 self.a.set(res);
                 self.f.z = res == 0;
                 self.f.n = false;
-                4
+                cycles
             }
 
             Instruction::SBC_A(op) => {
                 let carry = if self.f.c { 1 } else { 0 };
-                let mut val = self.val_from_op8(&op);
+                let (mut val, cycles) = self.val_from_op8(&op);
                 val = val.wrapping_add(carry);
                 let res = self.sub_u8_with_flags(self.a.get(), val);
                 self.a.set(res);
                 self.f.z = res == 0;
                 self.f.n = false;
-                4
+                cycles
             }
 
             Instruction::AND_A(op) => {
-                let val = self.val_from_op8(&op);
+                let (val, cycles) = self.val_from_op8(&op);
                 let res = self.a.get() & val;
                 self.a.set(res);
                 self.f.z = res == 0;
                 self.f.n = false;
                 self.f.h = true;
                 self.f.c = false;
-                4
+                cycles
             }
 
             Instruction::XOR_A(op) => {
-                let val = self.val_from_op8(&op);
+                let (val, cycles) = self.val_from_op8(&op);
                 let res = self.a.get() ^ val;
                 self.a.set(res);
                 self.f.z = res == 0;
                 self.f.n = false;
                 self.f.h = false;
                 self.f.c = false;
-                4
+                cycles
             }
 
             Instruction::OR_A(op) => {
-                let val = self.val_from_op8(&op);
+                let (val, cycles) = self.val_from_op8(&op);
                 let res = self.a.get() | val;
                 self.a.set(res);
                 self.f.z = res == 0;
                 self.f.n = false;
                 self.f.h = false;
                 self.f.c = false;
-                4
+                cycles
             }
 
             Instruction::CP_A(op) => {
-                let val = self.val_from_op8(&op);
+                let (val, cycles) = self.val_from_op8(&op);
                 let res = self.sub_u8_with_flags(self.a.get(), val);
                 self.f.z = res == 0;
                 self.f.n = false;
-                4
+                cycles
             }
 
             Instruction::JP(cond, src) => {
-                let addr = self.val_from_op16(&src);
+                let (addr, mut cycles) = self.val_from_op16(&src);
                 let cond = self.check_cond(&cond);
-                // TODO: setting pc takes T-states, unless addr is from another register (HL)
-                // probably make r16 symbol for PC and prefer to use set_r16 where it can check
-                // source
                 if cond {
                     self.pc = addr;
+                    cycles += match src {
+                        Op16::Reg(_) => 0,
+                        _ => 1,
+                    };
                 }
-                0
+                cycles
             }
 
             // Instruction::JP_n16 => {
@@ -746,14 +771,14 @@ impl CPU<'_> {
             //     4
             // }
             Instruction::JR(cond) => {
-                let ofs = self.fetch() as i8;
+                let (ofs, mut cycles) = self.fetch();
+                let ofs_i8 = ofs as i8;
                 let cond = self.check_cond(&cond);
                 if cond {
-                    // TODO: although just adding to PC, this requires 4 T-states. Prob just
-                    // manually set
-                    self.pc = self.pc.wrapping_add_signed(ofs.into()) + 2;
+                    self.pc = self.pc.wrapping_add_signed(ofs_i8.into()) + 2;
+                    cycles += 1;
                 }
-                0
+                cycles
             }
 
             // Instruction::JR_n16 => {
@@ -775,14 +800,16 @@ impl CPU<'_> {
             //     }
             // }
             Instruction::RET(cond) => {
-                // TODO: why extra M cycle for conditional (20/8 instead of 16/4)
-                // why is RET and RETI 16 but RET cond taken is 20
+                let mut cycles = 1; // condition check is done in a full cycle
                 let cond = self.check_cond(&cond);
                 if cond {
-                    let val = self.stack_pop_u16();
+                    let (val, c) = self.stack_pop_u16();
+                    cycles += c;
+
                     self.pc = val;
+                    cycles += 1; // setting pc must be done after stack pop cycles are done
                 }
-                0
+                cycles
             }
 
             // Instruction::RET => {
@@ -802,49 +829,53 @@ impl CPU<'_> {
             //     20
             // }
             Instruction::RETI => {
-                self.execute(Instruction::RET(Condition::None));
+                let cycles = self.execute(Instruction::RET(Condition::None));
                 self.set_ime = false;
                 self.ime = true;
-                16
+                cycles
             }
 
             Instruction::PUSH_r16(r16s) => {
                 let val = self.get_r16(&r16s);
-                self.stack_push_u16(val);
-                16
+                self.stack_push_u16(val)
             }
 
             Instruction::POP_r16(r16s) => {
-                let val = self.stack_pop_u16();
+                let (val, cycles) = self.stack_pop_u16();
                 self.set_r16(&r16s, val);
-                12
+                cycles
             }
 
             Instruction::PUSH_AF => {
                 let a = self.get_r8(&Reg8Symbol::A);
-                self.stack_push_u8(a);
+                let c1 = self.stack_push_u8(a);
 
                 let f = self.f.to_u8();
-                self.stack_push_u8(f << 4);
-                16
+                let c2 = self.stack_push_u8(f << 4);
+
+                c1 + c2
             }
 
             Instruction::POP_AF => {
-                let f_new = self.stack_pop_u8() & 0xF0;
+                let (f_new, mut cycles) = self.stack_pop_u8();
+                f_new = f_new & 0xF0;
                 self.f.set_from_u8(f_new >> 4);
 
-                let a_new = self.stack_pop_u8();
+                let (a_new, c) = self.stack_pop_u8();
+                cycles += c;
                 self.set_r8(&Reg8Symbol::A, a_new);
-                12
+
+                cycles
             }
 
             Instruction::CALL(cond) => {
-                let addr = self.fetch_2();
+                let (addr, mut cycles) = self.fetch_2();
                 let cond = self.check_cond(&cond);
                 if cond {
-                    self.stack_push_u16(self.pc);
+                    cycles += self.stack_push_u16(self.pc);
+                    self.pc = addr; // done concurrently with stack push, no extra cycles
                 }
-                0
+                cycles
             }
 
             // Instruction::CALL_n16 => {
@@ -871,37 +902,37 @@ impl CPU<'_> {
             // }
             Instruction::RST(addr) => {
                 let ret_addr = self.pc;
-                self.stack_push_u16(ret_addr);
+                let cycles = self.stack_push_u16(ret_addr);
                 self.pc = addr;
-                16
+                cycles
             }
 
             Instruction::RLCA => {
                 let mut val = self.get_r8(&Reg8Symbol::A);
                 val = self.u8_rot_left(val);
                 self.set_r8(&Reg8Symbol::A, val);
-                4
+                0
             }
 
             Instruction::RRCA => {
                 let mut val = self.get_r8(&Reg8Symbol::A);
                 val = self.u8_rot_right(val);
                 self.set_r8(&Reg8Symbol::A, val);
-                4
+                0
             }
 
             Instruction::RLA => {
                 let mut val = self.get_r8(&Reg8Symbol::A);
                 val = self.u8_rot_left_through_carry(val);
                 self.set_r8(&Reg8Symbol::A, val);
-                4
+                0
             }
 
             Instruction::RRA => {
                 let mut val = self.get_r8(&Reg8Symbol::A);
                 val = self.u8_rot_right_through_carry(val);
                 self.set_r8(&Reg8Symbol::A, val);
-                4
+                0
             }
 
             Instruction::DAA => {
@@ -935,7 +966,7 @@ impl CPU<'_> {
                     self.f.z = true;
                 }
 
-                4
+                0
             }
 
             Instruction::CPL => {
@@ -943,32 +974,32 @@ impl CPU<'_> {
                 self.f.h = true;
 
                 self.set_r8(&Reg8Symbol::A, !self.get_r8(&Reg8Symbol::A));
-                4
+                0
             }
 
             Instruction::SCF => {
                 self.f.n = false;
                 self.f.h = false;
                 self.f.c = true;
-                4
+                0
             }
 
             Instruction::CCF => {
                 self.f.n = false;
                 self.f.h = false;
                 self.f.c = !self.f.c;
-                4
+                0
             }
 
             Instruction::DI => {
                 self.set_ime = false;
                 self.ime = false;
-                4
+                0
             }
 
             Instruction::EI => {
                 self.set_ime = true;
-                4
+                0
             }
 
             Instruction::STOP => {
@@ -977,155 +1008,132 @@ impl CPU<'_> {
 
             Instruction::HALT => {
                 self.halted = true;
-                4
+                0
             }
 
             Instruction::PREFIX => {
-                let op = self.fetch();
+                let (op, cycles) = self.fetch();
                 let inst = Instruction::decode_prefix(op);
-                4 + self.execute(inst)
+                cycles + self.execute(inst)
             }
 
             Instruction::RL(op, cir) => {
-                let val = self.val_from_op8(&op);
+                let (val, mut cycles) = self.val_from_op8(&op);
 
                 let new = if cir {
                     self.u8_rot_left(val)
                 } else {
                     self.u8_rot_left_through_carry(val)
                 };
+                cycles += 1;
 
                 self.f.z = new == 0;
-                self.write_to_op8(&op, new);
+                self.write_to_op8(&op, new); // writing done concurrently with flag setting
 
-                match op {
-                    Op8::Reg(_) => 8,
-                    Op8::Addr(_) => 12,
-                    Op8::Byte => panic!(),
-                }
+                cycles
             }
 
             Instruction::RR(op, cir) => {
-                let val = self.val_from_op8(&op);
+                let (val, mut cycles) = self.val_from_op8(&op);
 
                 let new = if cir {
                     self.u8_rot_right(val)
                 } else {
                     self.u8_rot_right_through_carry(val)
                 };
+                cycles += 1;
 
                 self.f.z = new == 0;
                 self.write_to_op8(&op, new);
 
-                match op {
-                    Op8::Reg(_) => 8,
-                    Op8::Addr(_) => 12,
-                    Op8::Byte => panic!(),
-                }
+                cycles
             }
 
             Instruction::SLA(op) => {
-                let val = self.val_from_op8(&op);
-                self.f.c = val & 128 == 128;
+                let (val, mut cycles) = self.val_from_op8(&op);
                 let new = val << 1;
+                cycles += 1;
+
                 self.f.z = new == 0;
                 self.f.n = false;
                 self.f.h = false;
+                self.f.c = val & 128 == 128;
                 self.write_to_op8(&op, new);
 
-                match op {
-                    Op8::Reg(_) => 8,
-                    Op8::Addr(_) => 12,
-                    Op8::Byte => panic!(),
-                }
+                cycles
             }
 
             Instruction::SRA(op) => {
-                let val = self.val_from_op8(&op);
-                self.f.c = val & 1 == 1;
+                let (val, mut cycles) = self.val_from_op8(&op);
                 let new = val >> 1;
+                cycles += 1;
+
                 self.f.z = new == 0;
                 self.f.n = false;
                 self.f.h = false;
+                self.f.c = val & 1 == 1;
                 self.write_to_op8(&op, new);
 
-                match op {
-                    Op8::Reg(_) => 8,
-                    Op8::Addr(_) => 12,
-                    Op8::Byte => panic!(),
-                }
+                cycles
             }
 
             Instruction::SWAP(op) => {
-                let val = self.val_from_op8(&op);
+                let (val, mut cycles) = self.val_from_op8(&op);
                 let high = val & 0xF0;
                 let low = val & 0x0F;
                 let new = (low << 4) | high;
+                cycles += 1;
+
                 self.f.z = val == 0;
                 self.f.n = false;
                 self.f.h = false;
                 self.f.c = false;
                 self.write_to_op8(&op, new);
 
-                match op {
-                    Op8::Reg(_) => 8,
-                    Op8::Addr(_) => 16,
-                    Op8::Byte => panic!(),
-                }
+                cycles
             }
 
             Instruction::SRL(op) => {
-                let val = self.val_from_op8(&op);
-                self.f.c = val & 1 == 1;
+                let (val, mut cycles) = self.val_from_op8(&op);
                 let new = val >> 1;
+                cycles += 1;
+
                 self.f.z = val == 0;
                 self.f.n = false;
                 self.f.h = false;
+                self.f.c = val & 1 == 1;
                 self.write_to_op8(&op, new);
 
-                match op {
-                    Op8::Reg(_) => 8,
-                    Op8::Addr(_) => 12,
-                    Op8::Byte => panic!(),
-                }
+                cycles
             }
 
             Instruction::BIT(n, op) => {
-                let mut val = self.val_from_op8(&op);
+                let (mut val, mut cycles) = self.val_from_op8(&op);
                 val = val >> n;
                 self.f.z = val & 1 == 0;
                 self.f.n = false;
                 self.f.h = true;
+                cycles += 1;
 
-                match op {
-                    Op8::Reg(_) => 8,
-                    Op8::Addr(_) => 12,
-                    Op8::Byte => panic!(),
-                }
+                cycles
             }
 
             Instruction::RES(n, op) => {
-                let val = self.val_from_op8(&op);
+                let (val, mut cycles) = self.val_from_op8(&op);
                 let new = val & !(1 << n);
+                cycles += 1;
                 self.write_to_op8(&op, new);
 
-                match op {
-                    Op8::Reg(_) => 8,
-                    Op8::Addr(_) => 12,
-                    Op8::Byte => panic!(),
-                }
+                cycles
             }
 
             Instruction::SET(n, op) => {
-                let val = self.val_from_op8(&op);
+                let (val, mut cycles) = self.val_from_op8(&op);
                 let new = val | (1 << n);
+                cycles += 1;
                 self.write_to_op8(&op, new);
 
-                match op {
-                    Op8::Reg(_) => 8,
-                    Op8::Addr(_) => 12,
-                    Op8::Byte => panic!(),
-                }
+                cycles
             }
 
             Instruction::NotImplemented => 4,
@@ -1142,9 +1150,9 @@ impl CPU<'_> {
             self.ime = true;
         }
 
-        let opcode = self.fetch();
+        let (opcode, mut cycles) = self.fetch();
         let inst = Instruction::decode(opcode);
-        self.execute(inst);
+        cycles += self.execute(inst);
         self.handle_interrupt();
     }
 

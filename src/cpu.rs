@@ -450,7 +450,7 @@ impl CPU<'_> {
     // cycles executed to develop accurate timing. Yields number of M-cycles.
     fn execute(&mut self, inst: Instruction) -> u8 {
         match inst {
-            Instruction::NOP => 1,
+            Instruction::NOP => 0,
 
             Instruction::LD_8_8(dst, src) => {
                 let (val, cycles) = self.val_from_op8(&src);
@@ -857,7 +857,7 @@ impl CPU<'_> {
             }
 
             Instruction::POP_AF => {
-                let (f_new, mut cycles) = self.stack_pop_u8();
+                let (mut f_new, mut cycles) = self.stack_pop_u8();
                 f_new = f_new & 0xF0;
                 self.f.set_from_u8(f_new >> 4);
 

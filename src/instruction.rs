@@ -1,3 +1,6 @@
+use std::fmt;
+
+#[derive(Debug)]
 pub enum Reg8Symbol {
     A,
     B,
@@ -8,7 +11,7 @@ pub enum Reg8Symbol {
     L,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Reg16Symbol {
     BC,
     DE,
@@ -16,11 +19,6 @@ pub enum Reg16Symbol {
     HLI,
     HLD,
     SP,
-}
-
-pub enum FlagSymbol {
-    Z,
-    C,
 }
 
 // operand sources for instructions types for which a u8 can be retrieved
@@ -33,17 +31,49 @@ pub enum Op8 {
     C,                 // add carry flag to 0xFF00, use that address
 }
 
+impl fmt::Display for Op8 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Reg(r) => write!(f, "{:?}", r),
+            Self::Addr(r) => write!(f, "{:?}", r),
+            Self::Byte => write!(f, "n8"),
+            Self::AddrBytes => write!(f, "n16"),
+            Self::HighByte => write!(f, "H-n8"),
+            Self::C => write!(f, "H-C"),
+        }
+    }
+}
+
 pub enum Op16 {
     Reg(Reg16Symbol),
     Bytes,
 }
 
+impl fmt::Display for Op16 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Reg(r) => write!(f, "{:?}", r),
+            Self::Bytes => write!(f, "n16"),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum Condition {
     None,
     C,
     Z,
     NC,
     NZ,
+}
+
+impl fmt::Display for Condition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::None => write!(f, ""),
+            v => write!(f, " {:?}", v),
+        }
+    }
 }
 
 #[allow(non_camel_case_types)]
@@ -704,6 +734,75 @@ impl Instruction {
             0xFD => Instruction::SET(7, Op8::Reg(Reg8Symbol::L)),
             0xFE => Instruction::SET(7, Op8::Addr(Reg16Symbol::HL)),
             0xFF => Instruction::SET(7, Op8::Reg(Reg8Symbol::A)),
+        }
+    }
+}
+
+impl fmt::Display for Instruction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NOP => write!(f, "NOP"),
+            Self::LD_8_8(dst, src) => write!(f, "LD {dst} {src}"),
+            Self::LD_16_16(dst, src) => write!(f, "LD {dst} {src}"),
+            Self::LD_a16_SP => write!(f, "LD a16 SP"),
+            Self::LD_HL_SP_e8 => write!(f, "LD HL SP+e8"),
+            Self::INC_r16(r) => write!(f, "INC {:?}", r),
+            Self::INC_r8(r) => write!(f, "INC {:?}", r),
+            Self::DEC_r16(r) => write!(f, "DEC {:?}", r),
+            Self::DEC_r8(r) => write!(f, "DEC {:?}", r),
+            Self::ADD_HL_r16(r) => write!(f, "ADD HL {:?}", r),
+            Self::ADD_A(op) => write!(f, "ADD A {op}"),
+            Self::ADD_SP_e8 => write!(f, "ADD SP e8"),
+            Self::ADC_A(op) => write!(f, "ADC A {op}"),
+            Self::SUB_A(op) => write!(f, "SUB A {op}"),
+            Self::SBC_A(op) => write!(f, "SBC A {op}"),
+            Self::AND_A(op) => write!(f, "AND A {op}"),
+            Self::XOR_A(op) => write!(f, "XOR A {op}"),
+            Self::OR_A(op) => write!(f, "OR A {op}"),
+            Self::CP_A(op) => write!(f, "CP A {op}"),
+            Self::JP(cond, op) => write!(f, "JP{cond} {op}"),
+            Self::JR(cond) => write!(f, "JR{cond}"),
+            Self::RET(cond) => write!(f, "RET{cond}"),
+            Self::RETI => write!(f, "RETI"),
+            Self::PUSH_r16(r) => write!(f, "PUSH {:?}", r),
+            Self::POP_r16(r) => write!(f, "POP {:?}", r),
+            Self::PUSH_AF => write!(f, "PUSH AF"),
+            Self::POP_AF => write!(f, "POP AF"),
+            Self::CALL(cond) => write!(f, "CALL{cond}"),
+            Self::RST(n) => write!(f, "RST {n}"),
+            Self::RLCA => write!(f, "RLCA"),
+            Self::RRCA => write!(f, "RRCA"),
+            Self::RLA => write!(f, "RLA"),
+            Self::RRA => write!(f, "RRA"),
+            Self::DAA => write!(f, "DAA"),
+            Self::CPL => write!(f, "CPL"),
+            Self::SCF => write!(f, "SCF"),
+            Self::CCF => write!(f, "CCF"),
+            Self::DI => write!(f, "DI"),
+            Self::EI => write!(f, "EI"),
+            Self::STOP => write!(f, "STOP"),
+            Self::HALT => write!(f, "HALT"),
+            Self::PREFIX => write!(f, "PREFIX"),
+
+            Self::RL(op, cir) => {
+                let c = if *cir { "C" } else { "" };
+                write!(f, "RL{c} {op}")
+            }
+
+            Self::RR(op, cir) => {
+                let c = if *cir { "C" } else { "" };
+                write!(f, "RR{c} {op}")
+            }
+
+            Self::SLA(op) => write!(f, "SLA {op}"),
+            Self::SRA(op) => write!(f, "SRA {op}"),
+            Self::SWAP(op) => write!(f, "SWAP {op}"),
+            Self::SRL(op) => write!(f, "SRL {op}"),
+            Self::BIT(n, op) => write!(f, "BIT {n} {op}"),
+            Self::RES(n, op) => write!(f, "RES {n} {op}"),
+            Self::SET(n, op) => write!(f, "SET {n} {op}"),
+
+            Self::NotImplemented => write!(f, "Not Implemented"),
         }
     }
 }

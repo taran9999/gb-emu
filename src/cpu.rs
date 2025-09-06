@@ -1,7 +1,7 @@
 use std::cell::Cell;
 
 use crate::bus::Bus;
-use crate::instruction::{Condition, FlagSymbol, Instruction, Op16, Op8, Reg16Symbol, Reg8Symbol};
+use crate::instruction::{Condition, Instruction, Op16, Op8, Reg16Symbol, Reg8Symbol};
 
 // #[cfg(test)]
 // mod tests;
@@ -337,13 +337,6 @@ impl CPU<'_> {
         self.f.c = val & 1 == 1;
 
         val.rotate_right(1)
-    }
-
-    fn get_flag(&self, sym: &FlagSymbol) -> bool {
-        match sym {
-            FlagSymbol::Z => self.f.z,
-            FlagSymbol::C => self.f.c,
-        }
     }
 
     fn val_from_op8(&mut self, op: &Op8) -> (u8, u8) {
@@ -1150,10 +1143,13 @@ impl CPU<'_> {
             self.ime = true;
         }
 
+        self.handle_interrupt();
+
         let (opcode, mut cycles) = self.fetch();
         let inst = Instruction::decode(opcode);
+        print!("{inst}\t");
         cycles += self.execute(inst);
-        self.handle_interrupt();
+        println!("{cycles}")
     }
 
     fn handle_interrupt(&mut self) -> u8 {
@@ -1161,6 +1157,6 @@ impl CPU<'_> {
             return 0;
         }
 
-        20
+        5
     }
 }

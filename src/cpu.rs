@@ -470,53 +470,6 @@ impl CPU<'_> {
                 cycles
             }
 
-            // Instruction::LD_r8_r8(r8s1, r8s2) => {
-            //     // copy value at r82 to r81
-            //     let val = self.get_r8(&r8s2);
-            //     self.set_r8(&r8s1, val);
-            //     4
-            // }
-            //
-            // Instruction::LD_r8_n8(r8s) => {
-            //     let val = self.fetch();
-            //     self.set_r8(&r8s, val);
-            //     8
-            // }
-            //
-            // Instruction::LD_r8_r16(r8s, r16s) => {
-            //     // get value pointed to by r16 and store in r8
-            //     let addr = self.get_r16(&r16s) as usize;
-            //     let val = self.bus.read(addr as usize);
-            //     self.set_r8(&r8s, val);
-            //
-            //     if r16s == Reg16Symbol::HLI {
-            //         self.inc_r16(r16s);
-            //     } else if r16s == Reg16Symbol::HLD {
-            //         self.dec_r16(r16s);
-            //     }
-            //
-            //     8
-            // }
-            //
-            // Instruction::LD_r16_r8(r16s, r8s) => {
-            //     let address = self.get_r16(&r16s) as usize;
-            //     let value = self.get_r8(&r8s);
-            //     self.bus.write(address, value);
-            //
-            //     if r16s == Reg16Symbol::HLI {
-            //         self.inc_r16(r16s);
-            //     } else if r16s == Reg16Symbol::HLD {
-            //         self.dec_r16(r16s);
-            //     }
-            //
-            //     8
-            // }
-            //
-            // Instruction::LD_r16_n16(r16s) => {
-            //     let val = self.fetch_2();
-            //     self.set_r16(&r16s, val);
-            //     12
-            // }
             Instruction::LD_a16_SP => {
                 let (addr, _) = self.fetch_2();
 
@@ -526,33 +479,6 @@ impl CPU<'_> {
                 4
             }
 
-            // Instruction::LD_SP_HL => {
-            //     let val = self.get_r16(&Reg16Symbol::HL);
-            //     self.sp = val;
-            //     8
-            // }
-            //
-            // Instruction::LD_a16_A => {
-            //     let val = self.get_r8(&Reg8Symbol::A);
-            //     let addr = self.fetch_2();
-            //     self.bus.write(addr as usize, val);
-            //     16
-            // }
-            //
-            // Instruction::LD_A_a16 => {
-            //     let addr = self.fetch_2() as usize;
-            //     let val = self.bus.read(addr);
-            //     self.set_r8(&Reg8Symbol::A, val);
-            //     16
-            // }
-            //
-            // Instruction::LD_HL_n8 => {
-            //     let value = self.fetch();
-            //     let address = self.get_r16(&Reg16Symbol::HL) as usize;
-            //     self.bus.write(address, value);
-            //     12
-            // }
-
             // NOTE: should this actually add to sp or no
             Instruction::LD_HL_SP_e8 => {
                 self.execute(Instruction::ADD_SP_e8);
@@ -560,40 +486,6 @@ impl CPU<'_> {
                 2
             }
 
-            // Instruction::LDH_n8_A => {
-            //     let ofs = self.fetch();
-            //     let addr = ofs as u16 + 0xFF00;
-            //     self.bus.write(addr as usize, self.get_r8(&Reg8Symbol::A));
-            //     12
-            // }
-            //
-            // Instruction::LDH_A_n8 => {
-            //     let ofs = self.fetch();
-            //     let addr = ofs as u16 + 0xFF00;
-            //     let val = self.bus.read(addr as usize);
-            //     self.set_r8(&Reg8Symbol::A, val);
-            //     12
-            // }
-            //
-            // Instruction::LDH_C_A => {
-            //     let mut addr: usize = 0xFF00;
-            //     if self.f.c {
-            //         addr += 1
-            //     }
-            //     let val = self.get_r8(&Reg8Symbol::A);
-            //     self.bus.write(addr, val);
-            //     8
-            // }
-            //
-            // Instruction::LDH_A_C => {
-            //     let mut addr: usize = 0xFF00;
-            //     if self.f.c {
-            //         addr += 1;
-            //     }
-            //     let val = self.bus.read(addr);
-            //     self.set_r8(&Reg8Symbol::A, val);
-            //     8
-            // }
             Instruction::INC_r16(r16s) => self.inc_r16(r16s),
 
             Instruction::INC_r8(r8s) => {
@@ -755,28 +647,6 @@ impl CPU<'_> {
                 cycles
             }
 
-            // Instruction::JP_n16 => {
-            //     let addr = self.fetch_2();
-            //     self.pc = addr;
-            //     16
-            // }
-            //
-            // Instruction::JP_n16_Conditional(fls, on) => {
-            //     let flag = self.get_flag(&fls);
-            //     if flag == on {
-            //         let addr = self.fetch_2();
-            //         self.pc = addr;
-            //         16
-            //     } else {
-            //         12
-            //     }
-            // }
-            //
-            // Instruction::JP_HL => {
-            //     let val = self.get_r16(&Reg16Symbol::HL);
-            //     self.pc = val;
-            //     4
-            // }
             Instruction::JR(cond) => {
                 let (ofs, mut cycles) = self.fetch();
                 let ofs_i8 = ofs as i8;
@@ -788,24 +658,6 @@ impl CPU<'_> {
                 cycles
             }
 
-            // Instruction::JR_n16 => {
-            //     let ofs = self.fetch() as i8;
-            //     let addr = self.fetch_2();
-            //     self.pc = addr.wrapping_add_signed(ofs.into()) + 2;
-            //     12
-            // }
-            //
-            // Instruction::JR_n16_Conditional(fls, on) => {
-            //     let ofs = self.fetch() as i8;
-            //     let flag = self.get_flag(&fls);
-            //     if flag == on {
-            //         let addr = self.fetch_2();
-            //         self.pc = addr.wrapping_add_signed(ofs.into()) + 2;
-            //         12
-            //     } else {
-            //         8
-            //     }
-            // }
             Instruction::RET(cond) => {
                 let mut cycles = 1; // condition check is done in a full cycle
                 let cond = self.check_cond(&cond);
@@ -819,22 +671,6 @@ impl CPU<'_> {
                 cycles
             }
 
-            // Instruction::RET => {
-            //     let val = self.stack_pop_u16();
-            //     self.pc = val;
-            //     16
-            // }
-            //
-            // Instruction::RET_Conditional(fls, on) => {
-            //     let flag = self.get_flag(&fls);
-            //     if flag != on {
-            //         return 8;
-            //     }
-            //
-            //     let val = self.stack_pop_u16();
-            //     self.pc = val;
-            //     20
-            // }
             Instruction::RETI => {
                 let cycles = self.execute(Instruction::RET(Condition::None));
                 self.set_ime = false;
@@ -885,28 +721,6 @@ impl CPU<'_> {
                 cycles
             }
 
-            // Instruction::CALL_n16 => {
-            //     let ret_addr = self.pc + 3;
-            //     self.stack_push_u16(ret_addr);
-            //
-            //     let jump_addr = self.fetch_2();
-            //     self.pc = jump_addr;
-            //     24
-            // }
-            //
-            // Instruction::CALL_n16_Conditional(fls, on) => {
-            //     let flag = self.get_flag(&fls);
-            //     if flag != on {
-            //         return 12;
-            //     }
-            //
-            //     let ret_addr = self.pc + 3;
-            //     self.stack_push_u16(ret_addr);
-            //
-            //     let jump_addr = self.fetch_2();
-            //     self.pc = jump_addr;
-            //     24
-            // }
             Instruction::RST(addr) => {
                 let ret_addr = self.pc;
                 let cycles = self.stack_push_u16(ret_addr);

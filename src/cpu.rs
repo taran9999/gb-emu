@@ -7,6 +7,7 @@ use crate::instruction::{Condition, Instruction, Op16, Op8, Reg16Symbol, Reg8Sym
 // #[cfg(test)]
 // mod tests;
 
+#[derive(Clone)]
 struct Flags {
     z: bool,
     n: bool,
@@ -456,7 +457,10 @@ impl CPU<'_> {
     // from https://emudev.de/gameboy-emulator/opcode-cycles-and-timings/ return the number of
     // cycles executed to develop accurate timing. Yields number of M-cycles.
     fn execute(&mut self, inst: Instruction) -> u8 {
-        match inst {
+        let curr_pc = self.pc;
+        let inst_str = inst.to_string();
+
+        let cycles = match inst {
             Instruction::NOP => 0,
 
             Instruction::LD_8_8(dst, src) => {
@@ -958,12 +962,24 @@ impl CPU<'_> {
             }
 
             Instruction::NotImplemented => 4,
-        }
+        };
+
+        let a = self.a.get();
+        let f = self.f.clone();
+        let bc = self.get_r16(&Reg16Symbol::BC);
+        let de = self.get_r16(&Reg16Symbol::DE);
+        let hl = self.get_r16(&Reg16Symbol::HL);
+        println!(
+            "{:04X}\t{:<24}M: {cycles}\tA: {:02X}\tF: {f}\tBC: {:04X}\tDE: {:04X}\tHL: {:04X}",
+            curr_pc, inst_str, a, bc, de, hl
+        );
+
+        cycles
     }
 
-    pub fn step(&mut self) {
+    pub fn step(&mut self) -> u8 {
         if self.halted {
-            return;
+            return 0;
         }
 
         if self.set_ime {
@@ -975,9 +991,9 @@ impl CPU<'_> {
 
         let (opcode, mut cycles) = self.fetch();
         let inst = Instruction::decode(opcode);
-        print!("{:<24}\t", inst);
         cycles += self.execute(inst);
-        println!("M: {cycles}")
+
+        cycles
     }
 
     fn handle_interrupt(&mut self) -> u8 {

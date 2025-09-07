@@ -1,4 +1,5 @@
 use std::cell::Cell;
+use std::fmt;
 
 use crate::bus::Bus;
 use crate::instruction::{Condition, Instruction, Op16, Op8, Reg16Symbol, Reg8Symbol};
@@ -49,6 +50,19 @@ impl Flags {
         self.n = (val >> 1) & 1 == 1;
         self.h = (val >> 2) & 1 == 1;
         self.c = (val >> 3) & 1 == 1;
+    }
+}
+
+impl fmt::Display for Flags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}{}{}{}",
+            if self.z { "Z" } else { "-" },
+            if self.n { "N" } else { "-" },
+            if self.h { "H" } else { "-" },
+            if self.c { "C" } else { "-" }
+        )
     }
 }
 
@@ -1147,9 +1161,9 @@ impl CPU<'_> {
 
         let (opcode, mut cycles) = self.fetch();
         let inst = Instruction::decode(opcode);
-        print!("{inst}\t");
+        print!("{:<24}\t", inst);
         cycles += self.execute(inst);
-        println!("{cycles}")
+        println!("M: {cycles}")
     }
 
     fn handle_interrupt(&mut self) -> u8 {

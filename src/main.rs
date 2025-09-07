@@ -60,7 +60,7 @@ fn main() {
     let mut bus = Bus::new(&mut ch);
     let mut cpu = CPU::init(&mut bus);
 
-    for _ in 0..5 {
+    for _ in 0..10 {
         cpu.step();
     }
     println!("{}", cpu.export_state())

@@ -458,18 +458,29 @@ impl CPU<'_> {
     // cycles executed to develop accurate timing. Yields number of M-cycles.
     fn execute(&mut self, inst: Instruction) -> u8 {
         let curr_pc = self.pc;
-        let inst_str = inst.to_string();
+        let mut inst_str = inst.to_string();
 
         let cycles = match inst {
             Instruction::NOP => 0,
 
             Instruction::LD_8_8(dst, src) => {
                 let (val, cycles) = self.val_from_op8(&src);
+
+                if let Op8::Reg(_) = src {
+                } else {
+                    inst_str = format!("LD {dst} ${:02X}", val)
+                }
+
                 cycles + self.write_to_op8(&dst, val)
             }
 
             Instruction::LD_16_16(dst, src) => {
                 let (val, cycles) = self.val_from_op16(&src);
+
+                if let Op16::Bytes = src {
+                    inst_str = format!("LD {dst} ${:04X}", val);
+                }
+
                 self.write_to_op16(&dst, val);
                 cycles
             }
@@ -546,6 +557,10 @@ impl CPU<'_> {
                 self.a.set(res);
                 self.f.z = res == 0;
                 self.f.n = false;
+                if let Op8::Byte = op {
+                    inst_str = format!("CP A ${:2X}", val);
+                }
+
                 cycles
             }
 
@@ -574,6 +589,10 @@ impl CPU<'_> {
                 self.a.set(res);
                 self.f.z = res == 0;
                 self.f.n = false;
+                if let Op8::Byte = op {
+                    inst_str = format!("CP A ${:2X}", val);
+                }
+
                 cycles
             }
 
@@ -583,6 +602,10 @@ impl CPU<'_> {
                 self.a.set(res);
                 self.f.z = res == 0;
                 self.f.n = false;
+                if let Op8::Byte = op {
+                    inst_str = format!("CP A ${:2X}", val);
+                }
+
                 cycles
             }
 
@@ -594,6 +617,10 @@ impl CPU<'_> {
                 self.a.set(res);
                 self.f.z = res == 0;
                 self.f.n = false;
+                if let Op8::Byte = op {
+                    inst_str = format!("CP A ${:2X}", val);
+                }
+
                 cycles
             }
 
@@ -605,6 +632,10 @@ impl CPU<'_> {
                 self.f.n = false;
                 self.f.h = true;
                 self.f.c = false;
+
+                if let Op8::Byte = op {
+                    inst_str = format!("CP A ${:2X}", val);
+                }
                 cycles
             }
 
@@ -616,6 +647,10 @@ impl CPU<'_> {
                 self.f.n = false;
                 self.f.h = false;
                 self.f.c = false;
+
+                if let Op8::Byte = op {
+                    inst_str = format!("CP A ${:2X}", val);
+                }
                 cycles
             }
 
@@ -627,6 +662,10 @@ impl CPU<'_> {
                 self.f.n = false;
                 self.f.h = false;
                 self.f.c = false;
+
+                if let Op8::Byte = op {
+                    inst_str = format!("CP A ${:2X}", val);
+                }
                 cycles
             }
 
@@ -635,18 +674,26 @@ impl CPU<'_> {
                 let res = self.sub_u8_with_flags(self.a.get(), val);
                 self.f.z = res == 0;
                 self.f.n = false;
+
+                if let Op8::Byte = op {
+                    inst_str = format!("CP A ${:2X}", val);
+                }
                 cycles
             }
 
             Instruction::JP(cond, src) => {
                 let (addr, mut cycles) = self.val_from_op16(&src);
-                let cond = self.check_cond(&cond);
-                if cond {
+                let checked_cond = self.check_cond(&cond);
+                if checked_cond {
                     self.pc = addr;
                     cycles += match src {
                         Op16::Reg(_) => 0,
                         _ => 1,
                     };
+                }
+
+                if let Op16::Bytes = src {
+                    inst_str = format!("JP{cond} ${:04X}", addr);
                 }
                 cycles
             }

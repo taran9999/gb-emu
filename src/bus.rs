@@ -35,6 +35,8 @@ impl Bus<'_> {
     }
 
     pub fn write(&mut self, address: usize, value: u8) {
+        println!("Bus: Write ${:04X} <- ${:02X}", address, value);
+
         match address {
             0x0000..=0x7FFF => self.cart.cart_write(address, value),
             _ => println!("(Warning): write to unknown area {:X}", address),

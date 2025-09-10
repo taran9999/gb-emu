@@ -466,8 +466,7 @@ impl CPU<'_> {
             Instruction::LD_8_8(dst, src) => {
                 let (val, cycles) = self.val_from_op8(&src);
 
-                if let Op8::Reg(_) = src {
-                } else {
+                if let Op8::Byte = src {
                     inst_str = format!("LD {dst} ${:02X}", val)
                 }
 
@@ -558,7 +557,7 @@ impl CPU<'_> {
                 self.f.z = res == 0;
                 self.f.n = false;
                 if let Op8::Byte = op {
-                    inst_str = format!("CP A ${:2X}", val);
+                    inst_str = format!("CP A ${:02X}", val);
                 }
 
                 cycles
@@ -590,7 +589,7 @@ impl CPU<'_> {
                 self.f.z = res == 0;
                 self.f.n = false;
                 if let Op8::Byte = op {
-                    inst_str = format!("CP A ${:2X}", val);
+                    inst_str = format!("CP A ${:02X}", val);
                 }
 
                 cycles
@@ -603,7 +602,7 @@ impl CPU<'_> {
                 self.f.z = res == 0;
                 self.f.n = false;
                 if let Op8::Byte = op {
-                    inst_str = format!("CP A ${:2X}", val);
+                    inst_str = format!("CP A ${:02X}", val);
                 }
 
                 cycles
@@ -618,7 +617,7 @@ impl CPU<'_> {
                 self.f.z = res == 0;
                 self.f.n = false;
                 if let Op8::Byte = op {
-                    inst_str = format!("CP A ${:2X}", val);
+                    inst_str = format!("CP A ${:02X}", val);
                 }
 
                 cycles
@@ -634,7 +633,7 @@ impl CPU<'_> {
                 self.f.c = false;
 
                 if let Op8::Byte = op {
-                    inst_str = format!("CP A ${:2X}", val);
+                    inst_str = format!("CP A ${:02X}", val);
                 }
                 cycles
             }
@@ -649,7 +648,7 @@ impl CPU<'_> {
                 self.f.c = false;
 
                 if let Op8::Byte = op {
-                    inst_str = format!("CP A ${:2X}", val);
+                    inst_str = format!("CP A ${:02X}", val);
                 }
                 cycles
             }
@@ -664,7 +663,7 @@ impl CPU<'_> {
                 self.f.c = false;
 
                 if let Op8::Byte = op {
-                    inst_str = format!("CP A ${:2X}", val);
+                    inst_str = format!("CP A ${:02X}", val);
                 }
                 cycles
             }
@@ -676,7 +675,7 @@ impl CPU<'_> {
                 self.f.n = false;
 
                 if let Op8::Byte = op {
-                    inst_str = format!("CP A ${:2X}", val);
+                    inst_str = format!("CP A ${:02X}", val);
                 }
                 cycles
             }
@@ -1034,9 +1033,11 @@ impl CPU<'_> {
             self.ime = true;
         }
 
-        self.handle_interrupt();
+        let mut cycles = self.handle_interrupt();
 
-        let (opcode, mut cycles) = self.fetch();
+        let (opcode, c) = self.fetch();
+        cycles += c;
+
         let inst = Instruction::decode(opcode);
         cycles += self.execute(inst);
 

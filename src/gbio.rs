@@ -15,7 +15,7 @@ impl Io {
         match address {
             0xFF01 => self.serial_data,
             0xFF02 => self.serial_control,
-            _ => panic!("Unsupported read to io at ${:04X}", address),
+            _ => panic!("io read out of bounds at ${:04X}", address),
         }
     }
 
@@ -23,7 +23,7 @@ impl Io {
         match address {
             0xFF01 => self.serial_data = value,
             0xFF02 => self.serial_control = value,
-            _ => panic!("Unsuppored write to io at ${:04X}", address),
+            _ => panic!("io write out of bounds at ${:04X}", address),
         }
     }
 }

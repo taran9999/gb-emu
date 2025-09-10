@@ -4,10 +4,12 @@ use std::io::{self, Read, Write};
 use bus::Bus;
 use cart::Cart;
 use cpu::CPU;
+use gbio::Io;
 
 mod bus;
 mod cart;
 mod cpu;
+mod gbio;
 mod instruction;
 
 fn main() {
@@ -57,7 +59,8 @@ fn main() {
 
     ch.print_header();
 
-    let mut bus = Bus::new(&mut ch);
+    let mut io = Io::new();
+    let mut bus = Bus::new(&mut ch, &mut io);
     let mut cpu = CPU::init(&mut bus);
 
     for _ in 0..10 {

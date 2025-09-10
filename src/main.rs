@@ -5,12 +5,14 @@ use bus::Bus;
 use cart::Cart;
 use cpu::CPU;
 use gbio::Io;
+use ram::Ram;
 
 mod bus;
 mod cart;
 mod cpu;
 mod gbio;
 mod instruction;
+mod ram;
 
 fn main() {
     // read a directory for file selection
@@ -60,7 +62,8 @@ fn main() {
     ch.print_header();
 
     let mut io = Io::new();
-    let mut bus = Bus::new(&mut ch, &mut io);
+    let mut ram = Ram::new();
+    let mut bus = Bus::new(&mut ch, &mut io, &mut ram);
     let mut cpu = CPU::init(&mut bus);
 
     for _ in 0..10 {

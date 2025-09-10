@@ -7,7 +7,7 @@ pub struct Cart {
 
 struct CartHeader {
     entry: [u8; 4],
-    nin_logo: [u8; 0x30],
+    _nin_logo: [u8; 0x30],
     title: [u8; 0x10],
     cgb_flag: CGBFlag,
     new_lic_code: u16,
@@ -328,7 +328,7 @@ impl CartHeader {
 
         CartHeader {
             entry,
-            nin_logo,
+            _nin_logo: nin_logo,
             title,
             cgb_flag: cgb_flag_from_byte(rom[0x143])
                 .expect(&format!("No cgb flag mapped for {:X?}", rom[0x143])),

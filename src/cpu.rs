@@ -1015,8 +1015,8 @@ impl CPU<'_> {
         let de = self.get_r16(&Reg16Symbol::DE);
         let hl = self.get_r16(&Reg16Symbol::HL);
         println!(
-            "CPU: {:04X}\t{:<24}M: {cycles}\tA: {:02X}\tF: {f}\tBC: {:04X}\tDE: {:04X}\tHL: {:04X}",
-            curr_pc, inst_str, a, bc, de, hl
+            "CPU: {:04X}\t{:<24}M: {cycles}\tA: {:02X}\tF: {f}\tBC: {:04X}\tDE: {:04X}\tHL: {:04X}\tSP: {:04X}",
+            curr_pc, inst_str, a, bc, de, hl, self.sp
         );
 
         cycles

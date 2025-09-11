@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
 
@@ -63,11 +64,15 @@ fn main() {
 
     let mut io = Io::new();
     let mut ram = Ram::new();
-    let mut bus = Bus::new(&mut ch, &mut io, &mut ram);
-    let mut cpu = CPU::init(&mut bus);
+    let bus = RefCell::new(Bus::new(&mut ch, &mut io, &mut ram));
+    let mut cpu = CPU::init(&bus);
+    let mut dbg_str = String::new();
 
-    for _ in 0..10 {
+    loop {
         cpu.step();
+        if (&bus).borrow().read(0xFF02) == 0x81 {
+            dbg_str.push((&bus).borrow().read(0xFF01) as char);
+            println!("{dbg_str}");
+        }
     }
-    println!("{}", cpu.export_state())
 }

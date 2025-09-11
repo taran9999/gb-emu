@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::fmt;
 
 use crate::bus::Bus;
@@ -81,7 +81,7 @@ pub struct CPU<'a> {
     ime: bool,
     set_ime: bool,
     halted: bool,
-    bus: &'a mut Bus<'a>,
+    bus: &'a RefCell<Bus<'a>>,
 }
 
 /*
@@ -95,7 +95,7 @@ pub struct CPU<'a> {
 * Bus read/write: 1
 */
 impl CPU<'_> {
-    pub fn init<'a>(bus: &'a mut Bus<'a>) -> CPU<'a> {
+    pub fn init<'a>(bus: &'a RefCell<Bus<'a>>) -> CPU<'a> {
         CPU {
             a: Cell::new(0),
             b: Cell::new(0),
@@ -122,11 +122,11 @@ impl CPU<'_> {
     }
 
     fn bus_read(&self, addr: usize) -> (u8, u8) {
-        (self.bus.read(addr), 1)
+        (self.bus.borrow().read(addr), 1)
     }
 
     fn bus_write(&mut self, addr: usize, val: u8) -> u8 {
-        self.bus.write(addr, val);
+        self.bus.borrow_mut().write(addr, val);
         1
     }
 
@@ -266,7 +266,7 @@ impl CPU<'_> {
 
     fn stack_push_u8(&mut self, val: u8) -> u8 {
         self.sp = self.sp.wrapping_sub(1);
-        self.bus.write(self.sp as usize, val);
+        self.bus_write(self.sp as usize, val);
         2
     }
 
@@ -566,14 +566,13 @@ impl CPU<'_> {
             Instruction::ADD_SP_e8 => {
                 let (ofs, _) = self.fetch();
                 let ofs_signed = ofs as i8;
-                let ofs_u16 = ofs_signed as u16;
 
                 // set h and c flags as u8 addition
                 let sp_low = (self.sp & 0xFF) as u8;
                 self.f.h = (sp_low & 0x0F) + (ofs & 0x0F) > 0x0F;
                 self.f.c = (sp_low as u16) + (ofs as u16) > 0xFF;
 
-                self.sp = self.sp.wrapping_add(ofs_u16);
+                self.sp = self.sp.wrapping_add_signed(ofs_signed.into());
 
                 self.f.z = self.sp == 0;
                 self.f.n = false;

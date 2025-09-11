@@ -33,6 +33,7 @@ impl Bus<'_> {
             0x0000..=0x7FFF => self.cart.cart_read(address),
             0xC000..=0xDFFF => self.ram.wram_read(address),
             0xFF00..=0xFF7F => self.io.io_read(address),
+            0xFF80..=0xFFFE => self.ram.hram_read(address),
 
             _ => {
                 println!("(Warning): read from unknown area {:X}", address);
@@ -48,6 +49,7 @@ impl Bus<'_> {
             0x0000..=0x7FFF => self.cart.cart_write(address, value),
             0xC000..=0xDFFF => self.ram.wram_write(address, value),
             0xFF00..=0xFF7F => self.io.io_write(address, value),
+            0xFF80..=0xFFFE => self.ram.hram_write(address, value),
 
             _ => println!("(Warning): write to unknown area {:X}", address),
         }

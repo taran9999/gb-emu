@@ -769,7 +769,7 @@ impl fmt::Display for Instruction {
             Self::PUSH_AF => write!(f, "PUSH AF"),
             Self::POP_AF => write!(f, "POP AF"),
             Self::CALL(cond) => write!(f, "CALL{cond}"),
-            Self::RST(n) => write!(f, "RST {n}"),
+            Self::RST(n) => write!(f, "RST ${:04X}", n),
             Self::RLCA => write!(f, "RLCA"),
             Self::RRCA => write!(f, "RRCA"),
             Self::RLA => write!(f, "RLA"),

@@ -18,10 +18,10 @@ struct Flags {
 impl Flags {
     fn new() -> Flags {
         Flags {
-            z: false,
+            z: true,
             n: false,
-            h: false,
-            c: false,
+            h: true,
+            c: true,
         }
     }
 
@@ -97,13 +97,13 @@ pub struct CPU<'a> {
 impl CPU<'_> {
     pub fn init<'a>(bus: &'a RefCell<Bus<'a>>) -> CPU<'a> {
         CPU {
-            a: Cell::new(0),
+            a: Cell::new(0x01),
             b: Cell::new(0),
-            c: Cell::new(0),
+            c: Cell::new(0x13),
             d: Cell::new(0),
-            e: Cell::new(0),
-            h: Cell::new(0),
-            l: Cell::new(0),
+            e: Cell::new(0xD8),
+            h: Cell::new(0x01),
+            l: Cell::new(0x4D),
             f: Flags::new(),
             sp: 0xFFFE,
             pc: 0x100,
@@ -115,10 +115,16 @@ impl CPU<'_> {
     }
 
     pub fn export_state(&self) -> String {
-        format!("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X}",
-        self.a.get(), self.f.to_u8(), self.b.get(), self.c.get(),
-        self.d.get(), self.e.get(), self.h.get(), self.l.get(),
-        self.sp, self.pc)
+        format!("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}",
+        self.a.get(),
+        self.f.to_u8().reverse_bits(),
+        self.b.get(), self.c.get(), self.d.get(),
+        self.e.get(), self.h.get(), self.l.get(),
+        self.sp, self.pc,
+        self.bus_read(self.pc as usize).0, 
+        self.bus_read((self.pc + 1) as usize).0, 
+        self.bus_read((self.pc + 2) as usize).0, 
+        self.bus_read((self.pc + 3) as usize).0)
     }
 
     fn bus_read(&self, addr: usize) -> (u8, u8) {

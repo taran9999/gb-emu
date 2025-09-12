@@ -187,13 +187,15 @@ impl CPU<'_> {
 
             // don't count additional m cycle for inc/dec as IDU does it concurrently with mem read
             Reg16Symbol::HLI => {
+                let (h, l) = (self.get_r8(&Reg8Symbol::H), self.get_r8(&Reg8Symbol::L));
                 self.inc_r16(Reg16Symbol::HL);
-                (self.get_r8(&Reg8Symbol::H), self.get_r8(&Reg8Symbol::L))
+                (h, l)
             }
 
             Reg16Symbol::HLD => {
+                let (h, l) = (self.get_r8(&Reg8Symbol::H), self.get_r8(&Reg8Symbol::L));
                 self.dec_r16(Reg16Symbol::HL);
-                (self.get_r8(&Reg8Symbol::H), self.get_r8(&Reg8Symbol::L))
+                (h, l)
             }
 
             // should not reach

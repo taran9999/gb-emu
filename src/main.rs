@@ -66,13 +66,6 @@ fn main() {
     let mut ram = Ram::new();
     let bus = RefCell::new(Bus::new(&mut ch, &mut io, &mut ram));
     let mut cpu = CPU::init(&bus);
-    let mut dbg_str = String::new();
 
-    loop {
-        cpu.step();
-        if (&bus).borrow().read(0xFF02) == 0x81 {
-            dbg_str.push((&bus).borrow().read(0xFF01) as char);
-            println!("{dbg_str}");
-        }
-    }
+    cpu.run(1000);
 }

@@ -1,5 +1,7 @@
 use std::cell::{Cell, RefCell};
-use std::fmt;
+use std::io::Write;
+use std::{fmt, fs};
+use std::path::Path;
 
 use crate::bus::Bus;
 use crate::instruction::{Condition, Instruction, Op16, Op8, Reg16Symbol, Reg8Symbol};
@@ -115,7 +117,7 @@ impl CPU<'_> {
     }
 
     pub fn export_state(&self) -> String {
-        format!("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}",
+        format!("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n",
         self.a.get(),
         self.f.to_u8().reverse_bits(),
         self.b.get(), self.c.get(), self.d.get(),
@@ -462,7 +464,7 @@ impl CPU<'_> {
     // Instructions take a variable amount of CPU cycles
     // from https://emudev.de/gameboy-emulator/opcode-cycles-and-timings/ return the number of
     // cycles executed to develop accurate timing. Yields number of M-cycles.
-    fn execute(&mut self, inst: Instruction) -> u8 {
+    fn execute(&mut self, inst: Instruction, logging_file: &mut fs::File) -> u8 {
         let curr_pc = self.pc;
         let mut inst_str = inst.to_string();
 
@@ -501,7 +503,7 @@ impl CPU<'_> {
 
             // NOTE: should this actually add to sp or no
             Instruction::LD_HL_SP_e8 => {
-                self.execute(Instruction::ADD_SP_e8);
+                self.execute(Instruction::ADD_SP_e8, logging_file);
                 self.set_r16(&Reg16Symbol::HL, self.sp);
                 2
             }
@@ -727,7 +729,7 @@ impl CPU<'_> {
             }
 
             Instruction::RETI => {
-                let cycles = self.execute(Instruction::RET(Condition::None));
+                let cycles = self.execute(Instruction::RET(Condition::None), logging_file);
                 self.set_ime = false;
                 self.ime = true;
                 cycles
@@ -890,7 +892,7 @@ impl CPU<'_> {
             Instruction::PREFIX => {
                 let (op, cycles) = self.fetch();
                 let inst = Instruction::decode_prefix(op);
-                cycles + self.execute(inst)
+                cycles + self.execute(inst, logging_file)
             }
 
             Instruction::RL(op, cir) => {
@@ -1020,15 +1022,18 @@ impl CPU<'_> {
         let bc = self.get_r16(&Reg16Symbol::BC);
         let de = self.get_r16(&Reg16Symbol::DE);
         let hl = self.get_r16(&Reg16Symbol::HL);
-        println!(
-            "CPU: {:04X}\t{:<24}M: {cycles}\tA: {:02X}\tF: {f}\tBC: {:04X}\tDE: {:04X}\tHL: {:04X}\tSP: {:04X}",
+
+        let state = format!(
+            "CPU: {:04X}\t{:<24}M: {cycles}\tA: {:02X}\tF: {f}\tBC: {:04X}\tDE: {:04X}\tHL: {:04X}\tSP: {:04X}\n",
             curr_pc, inst_str, a, bc, de, hl, self.sp
         );
+        logging_file.write_all(state.as_bytes()).expect("Failed to write to insts log");
+
 
         cycles
     }
 
-    pub fn step(&mut self) -> u8 {
+    fn step(&mut self, logging_file: &mut fs::File) -> u8 {
         if self.halted {
             return 0;
         }
@@ -1044,9 +1049,39 @@ impl CPU<'_> {
         cycles += c;
 
         let inst = Instruction::decode(opcode);
-        cycles += self.execute(inst);
+        cycles += self.execute(inst, logging_file);
 
         cycles
+    }
+
+    pub fn run(&mut self, max_cycles: u32) {
+        let logs_path = Path::new("gb_logs");
+        if logs_path.exists() {
+            fs::remove_dir_all(logs_path).expect("Failed to clear logs");
+        }
+        fs::create_dir(logs_path).expect("Failed to create logs dir");
+
+        let state_log_path = logs_path.join("cpu_state.log");
+        let insts_log_path = logs_path.join("instructions.log");
+
+        let mut state_log = fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(state_log_path)
+            .expect("Failed to open path to state log");
+        state_log.write_all(self.export_state().as_bytes()).expect("Failed to write to state log");
+
+        let mut insts_log = fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(insts_log_path)
+            .expect("Failed to open path to insts log");
+
+        let mut cycles = 0;
+        while cycles < max_cycles {
+            cycles += self.step(&mut insts_log) as u32;
+            state_log.write_all(self.export_state().as_bytes()).expect("Failed to write to state log");
+        }
     }
 
     fn handle_interrupt(&mut self) -> u8 {

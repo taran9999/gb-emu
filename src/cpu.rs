@@ -711,7 +711,7 @@ impl CPU<'_> {
                 let ofs_i8 = ofs as i8;
                 let cond = self.check_cond(&cond);
                 if cond {
-                    self.pc = self.pc.wrapping_add_signed(ofs_i8.into()) + 2;
+                    self.pc = self.pc.wrapping_add_signed(ofs_i8.into());
                     cycles += 1;
                 }
                 cycles

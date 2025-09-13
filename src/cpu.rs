@@ -535,14 +535,10 @@ impl CPU<'_> {
                 self.f.n = true;
 
                 // check if a borrow from bit 4 is required (bits 0-3 are off)
-                if r & 0x0F == 0 {
-                    self.f.h = true;
-                }
+                self.f.h = r & 0x0F == 0;
 
                 let new_val = r.wrapping_sub(1);
-                if new_val == 0 {
-                    self.f.z = true;
-                }
+                self.f.z = new_val == 0;
 
                 self.set_r8(&r8s, new_val);
                 0
@@ -1080,9 +1076,16 @@ impl CPU<'_> {
             .expect("Failed to open path to insts log");
 
         let mut cycles = 0;
+        let mut dbg_msg = String::new();
         while cycles < max_cycles {
             cycles += self.step(&mut insts_log) as u32;
             state_log.write_all(self.export_state().as_bytes()).expect("Failed to write to state log");
+
+            // Read debug message from blargg test
+            if self.bus_read(0xFF02).0 == 0x81 {
+                dbg_msg.push(self.bus_read(0xFF01).0 as char);
+            }
+            // println!("DBG: {}", dbg_msg);
         }
     }
 

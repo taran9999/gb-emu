@@ -33,7 +33,7 @@ impl Io<'_> {
             0xFF01 => self.serial_data = value,
             0xFF02 => self.serial_control = value,
             0xFF04..=0xFF07 => self.timer.timer_write(address, value),
-            0xFF0f => self.int_flag = value,
+            0xFF0F => self.int_flag = value,
             _ => panic!("io write out of bounds at ${:04X}", address),
         }
     }

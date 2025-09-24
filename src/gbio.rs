@@ -1,3 +1,4 @@
+use crate::interrupts::Interrupt;
 use crate::timer::Timer;
 
 pub struct Io<'a> {
@@ -31,5 +32,9 @@ impl Io<'_> {
             0xFF04..=0xFF07 => self.timer.timer_write(address, value),
             _ => panic!("io write out of bounds at ${:04X}", address),
         }
+    }
+
+    pub fn timer_tick(&mut self) -> Option<Interrupt> {
+        self.timer.tick()
     }
 }

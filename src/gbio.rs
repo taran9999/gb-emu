@@ -1,9 +1,9 @@
-use crate::timer::Timer
+use crate::timer::Timer;
 
 pub struct Io<'a> {
     serial_data: u8,
     serial_control: u8,
-    timer: &'a mut Timer
+    timer: &'a mut Timer,
 }
 
 impl Io<'_> {
@@ -11,7 +11,7 @@ impl Io<'_> {
         Io {
             serial_data: 0,
             serial_control: 0,
-            timer
+            timer,
         }
     }
 

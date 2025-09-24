@@ -1,4 +1,4 @@
-use crate::interrupts::Interrupt
+use crate::interrupts::Interrupt;
 
 pub struct Timer {
     div: u16,

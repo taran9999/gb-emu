@@ -27,7 +27,7 @@ impl Timer {
             _ => false,
         };
 
-        self.div += 1;
+        self.div = self.div.wrapping_add(1);
 
         // check enable bit of tac
         if update && (self.tac >> 2) & 1 == 1 {

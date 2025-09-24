@@ -1,3 +1,5 @@
+use crate::interrupts::Interrupt
+
 pub struct Timer {
     div: u16,
     tima: u8,
@@ -15,7 +17,7 @@ impl Timer {
         }
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self) -> Option<Interrupt> {
         // clock select
         let update = match self.tac & 0b11 {
             0b00 => self.div % 256 == 0,
@@ -32,9 +34,13 @@ impl Timer {
             self.tima += 1;
             if self.tima == 0xFF {
                 self.tima = self.tma;
+
                 // send timer interrupt
+                return Some(Interrupt::Timer);
             }
         }
+
+        None
     }
 
     pub fn timer_read(&self, addr: usize) -> u8 {

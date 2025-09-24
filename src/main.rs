@@ -14,6 +14,7 @@ mod cart;
 mod cpu;
 mod gbio;
 mod instruction;
+mod interrupts;
 mod ram;
 mod timer;
 

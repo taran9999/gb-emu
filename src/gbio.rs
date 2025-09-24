@@ -38,7 +38,9 @@ impl Io<'_> {
         }
     }
 
-    pub fn timer_tick(&mut self) -> Option<Interrupt> {
-        self.timer.tick()
+    pub fn timer_tick(&mut self) {
+        if let Some(Interrupt::Timer) = self.timer.tick() {
+            self.int_flag |= Interrupt::Timer.bit_enable();
+        }
     }
 }

@@ -19,12 +19,12 @@ FFFF: Interrupt Enable register
 
 pub struct Bus<'a> {
     cart: &'a mut Cart,
-    io: &'a mut Io,
+    io: &'a mut Io<'a>,
     ram: &'a mut Ram,
 }
 
 impl Bus<'_> {
-    pub fn new<'a>(cart: &'a mut Cart, io: &'a mut Io, ram: &'a mut Ram) -> Bus<'a> {
+    pub fn new<'a>(cart: &'a mut Cart, io: &'a mut Io<'a>, ram: &'a mut Ram) -> Bus<'a> {
         Bus { cart, io, ram }
     }
 
@@ -45,7 +45,7 @@ impl Bus<'_> {
     }
 
     pub fn write(&mut self, address: usize, value: u8) {
-        println!("Bus: Write ${:04X} <- ${:02X}", address, value);
+        // println!("Bus: Write ${:04X} <- ${:02X}", address, value);
 
         match address {
             0x0000..=0x7FFF => self.cart.cart_write(address, value),
@@ -57,5 +57,9 @@ impl Bus<'_> {
 
             _ => println!("(Warning): write to unknown area {:X}", address),
         }
+    }
+
+    pub fn timer_tick(&mut self) {
+        self.io.timer_tick();
     }
 }

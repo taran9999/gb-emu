@@ -5,6 +5,7 @@ use std::path::Path;
 
 use crate::bus::Bus;
 use crate::instruction::{Condition, Instruction, Op16, Op8, Reg16Symbol, Reg8Symbol};
+use crate::interrupts::Interrupt;
 
 // #[cfg(test)]
 // mod tests;
@@ -1084,8 +1085,8 @@ impl CPU<'_> {
             // Read debug message from blargg test
             if self.bus_read(0xFF02).0 == 0x81 {
                 dbg_msg.push(self.bus_read(0xFF01).0 as char);
+                println!("DBG: {}", dbg_msg);
             }
-            // println!("DBG: {}", dbg_msg);
         }
     }
 
@@ -1094,6 +1095,32 @@ impl CPU<'_> {
             return 0;
         }
 
-        5
+        let (int_flags, _) = self.bus_read(0xFF0F);
+        let interrupt = Interrupt::get_first(int_flags);
+        let handler_addr;
+        if let Some(ref t) = interrupt {
+            match t {
+                Interrupt::VBlank => handler_addr = 0x40,
+                Interrupt::LCD => handler_addr = 0x48,
+                Interrupt::Timer => handler_addr = 0x50,
+                Interrupt::Serial => handler_addr = 0x58,
+                Interrupt::Joypad => handler_addr = 0x60,
+            }
+        } else {
+            return 0;
+        }
+
+        let mut cycles = 2;  // 2 wait states
+
+        cycles += self.stack_push_u16(self.pc);
+
+        self.pc = handler_addr;
+        cycles += 1;
+
+        // unset the interrupt flag
+        // this part should be unreachable if interrupt is None
+        self.bus_write(0xFF0F, int_flags & !interrupt.unwrap().bit_enable());
+
+        cycles
     }
 }

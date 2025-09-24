@@ -16,4 +16,28 @@ impl Interrupt {
             Interrupt::Joypad => 1 << 4,
         }
     }
+
+    pub fn get_first(flags: u8) -> Option<Interrupt> {
+        if flags & 1 == 1 {
+            return Some(Interrupt::VBlank);
+        }
+
+        if (flags >> 1) & 1 == 1 {
+            return Some(Interrupt::LCD);
+        }
+
+        if (flags >> 2) & 1 == 1 {
+            return Some(Interrupt::Timer);
+        }
+
+        if (flags >> 3) & 1 == 1 {
+            return Some(Interrupt::Serial);
+        }
+
+        if (flags >> 4) & 1 == 1 {
+            return Some(Interrupt::Joypad);
+        }
+
+        None
+    }
 }

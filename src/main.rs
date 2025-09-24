@@ -7,6 +7,7 @@ use cart::Cart;
 use cpu::CPU;
 use gbio::Io;
 use ram::Ram;
+use timer::Timer;
 
 mod bus;
 mod cart;
@@ -14,6 +15,7 @@ mod cpu;
 mod gbio;
 mod instruction;
 mod ram;
+mod timer;
 
 fn main() {
     // read a directory for file selection
@@ -62,10 +64,11 @@ fn main() {
 
     ch.print_header();
 
-    let mut io = Io::new();
+    let mut timer = Timer::new();
+    let mut io = Io::new(&mut timer);
     let mut ram = Ram::new();
     let bus = RefCell::new(Bus::new(&mut ch, &mut io, &mut ram));
     let mut cpu = CPU::init(&bus);
 
-    cpu.run(1000);
+    cpu.run(1000000);
 }

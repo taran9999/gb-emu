@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
 
+use apu::APU;
 use bus::Bus;
 use cart::Cart;
 use cpu::CPU;
@@ -9,6 +10,7 @@ use gbio::Io;
 use ram::Ram;
 use timer::Timer;
 
+mod apu;
 mod bus;
 mod cart;
 mod cpu;
@@ -66,7 +68,8 @@ fn main() {
     ch.print_header();
 
     let mut timer = Timer::new();
-    let mut io = Io::new(&mut timer);
+    let mut apu = APU::new();
+    let mut io = Io::new(&mut timer, &mut apu);
     let mut ram = Ram::new();
     let bus = RefCell::new(Bus::new(&mut ch, &mut io, &mut ram));
     let mut cpu = CPU::init(&bus);

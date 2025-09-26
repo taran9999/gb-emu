@@ -564,7 +564,7 @@ impl CPU<'_> {
                 self.f.z = res == 0;
                 self.f.n = false;
                 if let Op8::Byte = op {
-                    inst_str = format!("CP A ${:02X}", val);
+                    inst_str = format!("ADD A ${:02X}", val);
                 }
 
                 cycles
@@ -595,7 +595,7 @@ impl CPU<'_> {
                 self.f.z = res == 0;
                 self.f.n = false;
                 if let Op8::Byte = op {
-                    inst_str = format!("CP A ${:02X}", val);
+                    inst_str = format!("ADC A ${:02X}", val);
                 }
 
                 cycles
@@ -608,7 +608,7 @@ impl CPU<'_> {
                 self.f.z = res == 0;
                 self.f.n = false;
                 if let Op8::Byte = op {
-                    inst_str = format!("CP A ${:02X}", val);
+                    inst_str = format!("SUB A ${:02X}", val);
                 }
 
                 cycles
@@ -623,7 +623,7 @@ impl CPU<'_> {
                 self.f.z = res == 0;
                 self.f.n = false;
                 if let Op8::Byte = op {
-                    inst_str = format!("CP A ${:02X}", val);
+                    inst_str = format!("SBC A ${:02X}", val);
                 }
 
                 cycles
@@ -639,7 +639,7 @@ impl CPU<'_> {
                 self.f.c = false;
 
                 if let Op8::Byte = op {
-                    inst_str = format!("CP A ${:02X}", val);
+                    inst_str = format!("AND A ${:02X}", val);
                 }
                 cycles
             }
@@ -654,7 +654,7 @@ impl CPU<'_> {
                 self.f.c = false;
 
                 if let Op8::Byte = op {
-                    inst_str = format!("CP A ${:02X}", val);
+                    inst_str = format!("XOR A ${:02X}", val);
                 }
                 cycles
             }
@@ -669,7 +669,7 @@ impl CPU<'_> {
                 self.f.c = false;
 
                 if let Op8::Byte = op {
-                    inst_str = format!("CP A ${:02X}", val);
+                    inst_str = format!("OR A ${:02X}", val);
                 }
                 cycles
             }

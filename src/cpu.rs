@@ -1127,6 +1127,10 @@ impl CPU<'_> {
         self.bus_write(0xFF0F, int_flags & !interrupt.as_ref().unwrap().bit_enable());
         self.bus_write(0xFFFF, int_enable_flags & !interrupt.as_ref().unwrap().bit_enable());
 
+        // reset IME after an interrupt is serviced
+        self.set_ime = false;
+        self.ime = false;
+
         cycles
     }
 }

@@ -38,7 +38,7 @@ impl Bus<'_> {
             0xFF80..=0xFFFE => self.ram.hram_read(address),
 
             _ => {
-                println!("(Warning): read from unknown area ${:04X}", address);
+                println!("(Warning): Bus read out of bounds at ${:04X}", address);
                 0xFF
             }
         }
@@ -55,7 +55,7 @@ impl Bus<'_> {
             0xFF00..=0xFF7F | 0xFFFF => self.io.io_write(address, value),
             0xFF80..=0xFFFE => self.ram.hram_write(address, value),
 
-            _ => println!("(Warning): write to unknown area {:X}", address),
+            _ => println!("(Warning): Bus write out of bounds at ${:04X}", address),
         }
     }
 

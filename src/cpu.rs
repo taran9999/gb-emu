@@ -606,7 +606,7 @@ impl CPU<'_> {
                 let res = self.sub_u8_with_flags(self.a.get(), val);
                 self.a.set(res);
                 self.f.z = res == 0;
-                self.f.n = false;
+                self.f.n = true;
                 if let Op8::Byte = op {
                     inst_str = format!("SUB A ${:02X}", val);
                 }
@@ -621,7 +621,7 @@ impl CPU<'_> {
                 let res = self.sub_u8_with_flags(self.a.get(), val);
                 self.a.set(res);
                 self.f.z = res == 0;
-                self.f.n = false;
+                self.f.n = true;
                 if let Op8::Byte = op {
                     inst_str = format!("SBC A ${:02X}", val);
                 }

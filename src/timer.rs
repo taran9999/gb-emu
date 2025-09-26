@@ -59,7 +59,7 @@ impl Timer {
             0xFF05 => self.tima = val,
             0xFF06 => self.tma = val,
             0xFF07 => self.tac = val,
-            _ => panic!("timer write out of bounds at ${:04X}", addr),
+            _ => println!("(Warning) timer write out of bounds at ${:04X}", addr),
         }
     }
 }

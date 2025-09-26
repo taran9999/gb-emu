@@ -35,7 +35,7 @@ impl Ram {
         let addr = address - 0xC000;
 
         if addr >= 0x2000 {
-            panic!("wram write out of bounds at ${:04X}", address);
+            println!("(Warning) wram write out of bounds at ${:04X}", address);
         } else {
             self.wram[addr] = value;
         }
@@ -45,7 +45,7 @@ impl Ram {
         let addr = address - 0xFF80;
 
         if addr >= 0x7F {
-            panic!("hram write out of bounds at ${:04X}", address);
+            println!("(Warning) hram write out of bounds at ${:04X}", address);
         } else {
             self.hram[addr] = value;
         }

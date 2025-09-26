@@ -26,7 +26,7 @@ impl APU {
         match address {
             // TODO: CHns should not be changed, should the value be masked?
             0xFF26 => self.audio_master_control = value,
-            _ => panic!("APU write out of bounds at ${:04X}", address),
+            _ => println!("(Warning) APU write out of bounds at ${:04X}", address),
         }
     }
 }

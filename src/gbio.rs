@@ -30,6 +30,7 @@ impl Io<'_> {
             0xFF04..=0xFF07 => self.timer.timer_read(address),
             0xFF0F => self.int_flag,
             0xFF10..=0xFF3F => self.apu.apu_read(address),
+            0xFF44 => 0x90, // temp change for gameboy doctor
             0xFFFF => self.int_enable_flag,
             _ => panic!("io read out of bounds at ${:04X}", address),
         }

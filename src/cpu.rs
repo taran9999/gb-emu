@@ -1090,6 +1090,7 @@ impl CPU<'_> {
             if self.bus_read(0xFF02).0 == 0x81 {
                 dbg_msg.push(self.bus_read(0xFF01).0 as char);
                 println!("DBG: {}", dbg_msg);
+                self.bus_write(0xFF02, 0);
             }
         }
     }

@@ -9,7 +9,7 @@ pub struct Io<'a> {
 }
 
 impl Io<'_> {
-    pub fn new<'a>(timer: &'a mut Timer) -> Io {
+    pub fn new<'a>(timer: &'a mut Timer) -> Io<'a> {
         Io {
             serial_data: 0,
             serial_control: 0,

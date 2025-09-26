@@ -1050,6 +1050,10 @@ impl CPU<'_> {
         let inst = Instruction::decode(opcode);
         cycles += self.execute(inst, logging_file);
 
+        for _ in 0..4*cycles {
+            self.bus.borrow_mut().timer_tick();
+        }
+
         cycles
     }
 

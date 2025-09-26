@@ -34,7 +34,7 @@ impl Bus<'_> {
             0xC000..=0xDFFF => self.ram.wram_read(address),
             0xE000..=0xFDFF => panic!("prohibited memory read at ${:04X}", address),
             0xFEA0..=0xFEFF => panic!("prohibited memory read at ${:04X}", address),
-            0xFF00..=0xFF7F => self.io.io_read(address),
+            0xFF00..=0xFF7F | 0xFFFF => self.io.io_read(address),
             0xFF80..=0xFFFE => self.ram.hram_read(address),
 
             _ => {
@@ -52,7 +52,7 @@ impl Bus<'_> {
             0xC000..=0xDFFF => self.ram.wram_write(address, value),
             0xE000..=0xFDFF => panic!("prohibited memory write at ${:04X}", address),
             0xFEA0..=0xFEFF => panic!("prohibited memory write at ${:04X}", address),
-            0xFF00..=0xFF7F => self.io.io_write(address, value),
+            0xFF00..=0xFF7F | 0xFFFF => self.io.io_write(address, value),
             0xFF80..=0xFFFE => self.ram.hram_write(address, value),
 
             _ => println!("(Warning): write to unknown area {:X}", address),

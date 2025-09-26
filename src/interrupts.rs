@@ -17,24 +17,24 @@ impl Interrupt {
         }
     }
 
-    pub fn get_first(flags: u8) -> Option<Interrupt> {
-        if flags & 1 == 1 {
+    pub fn get_first(flags: u8, enable_flags: u8) -> Option<Interrupt> {
+        if (flags & 1 == 1) && (enable_flags & 1 == 1) {
             return Some(Interrupt::VBlank);
         }
 
-        if (flags >> 1) & 1 == 1 {
+        if ((flags >> 1) & 1 == 1) && ((enable_flags >> 1) & 1 == 1) {
             return Some(Interrupt::LCD);
         }
 
-        if (flags >> 2) & 1 == 1 {
+        if ((flags >> 2) & 1 == 1) && ((enable_flags >> 2) & 1 == 1) {
             return Some(Interrupt::Timer);
         }
 
-        if (flags >> 3) & 1 == 1 {
+        if ((flags >> 3) & 1 == 1) && ((enable_flags >> 3) & 1 == 1) {
             return Some(Interrupt::Serial);
         }
 
-        if (flags >> 4) & 1 == 1 {
+        if ((flags >> 4) & 1 == 1) && ((enable_flags >> 4) & 1 == 1) {
             return Some(Interrupt::Joypad);
         }
 

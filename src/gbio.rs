@@ -6,8 +6,9 @@ pub struct Io<'a> {
     serial_data: u8,
     serial_control: u8,
     timer: &'a mut Timer,
-    int_flag: u8,
     apu: &'a mut APU,
+    int_flag: u8,
+    int_enable_flag: u8,
 }
 
 impl Io<'_> {
@@ -16,8 +17,9 @@ impl Io<'_> {
             serial_data: 0,
             serial_control: 0,
             timer,
-            int_flag: 0,
             apu,
+            int_flag: 0,
+            int_enable_flag: 0,
         }
     }
 
@@ -28,6 +30,7 @@ impl Io<'_> {
             0xFF04..=0xFF07 => self.timer.timer_read(address),
             0xFF0F => self.int_flag,
             0xFF10..=0xFF3F => self.apu.apu_read(address),
+            0xFFFF => self.int_enable_flag,
             _ => panic!("io read out of bounds at ${:04X}", address),
         }
     }
@@ -39,6 +42,7 @@ impl Io<'_> {
             0xFF04..=0xFF07 => self.timer.timer_write(address, value),
             0xFF0F => self.int_flag = value,
             0xFF10..=0xFF3F => self.apu.apu_write(address, value),
+            0xFFFF => self.int_enable_flag = value,
             _ => panic!("io write out of bounds at ${:04X}", address),
         }
     }

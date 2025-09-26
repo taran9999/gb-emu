@@ -1100,7 +1100,8 @@ impl CPU<'_> {
         }
 
         let (int_flags, _) = self.bus_read(0xFF0F);
-        let interrupt = Interrupt::get_first(int_flags);
+        let (int_enable_flags, _) = self.bus_read(0xFFFF);
+        let interrupt = Interrupt::get_first(int_flags, int_enable_flags);
         let handler_addr;
         if let Some(ref t) = interrupt {
             match t {
@@ -1123,7 +1124,8 @@ impl CPU<'_> {
 
         // unset the interrupt flag
         // this part should be unreachable if interrupt is None
-        self.bus_write(0xFF0F, int_flags & !interrupt.unwrap().bit_enable());
+        self.bus_write(0xFF0F, int_flags & !interrupt.as_ref().unwrap().bit_enable());
+        self.bus_write(0xFFFF, int_enable_flags & !interrupt.as_ref().unwrap().bit_enable());
 
         cycles
     }

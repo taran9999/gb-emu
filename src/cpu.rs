@@ -678,7 +678,7 @@ impl CPU<'_> {
                 let (val, cycles) = self.val_from_op8(&op);
                 let res = self.sub_u8_with_flags(self.a.get(), val);
                 self.f.z = res == 0;
-                self.f.n = false;
+                self.f.n = true;
 
                 if let Op8::Byte = op {
                     inst_str = format!("CP A ${:02X}", val);

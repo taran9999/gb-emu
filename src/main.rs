@@ -74,5 +74,5 @@ fn main() {
     let bus = RefCell::new(Bus::new(&mut ch, &mut io, &mut ram));
     let mut cpu = CPU::init(&bus);
 
-    cpu.run(1000000);
+    cpu.run();
 }

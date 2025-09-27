@@ -825,7 +825,7 @@ impl CPU<'_> {
                         adj += 0x60;
                     }
 
-                    self.set_r8(&Reg8Symbol::A, self.get_r8(&Reg8Symbol::A) - adj);
+                    self.set_r8(&Reg8Symbol::A, self.get_r8(&Reg8Symbol::A).wrapping_sub(adj));
                 } else {
                     if self.f.h || self.get_r8(&Reg8Symbol::A) & 0x0F > 0x09 {
                         adj += 0x06;
@@ -836,7 +836,7 @@ impl CPU<'_> {
                         self.f.c = true;
                     }
 
-                    self.set_r8(&Reg8Symbol::A, self.get_r8(&Reg8Symbol::A) + adj);
+                    self.set_r8(&Reg8Symbol::A, self.get_r8(&Reg8Symbol::A).wrapping_add(adj));
                 }
 
                 if self.get_r8(&Reg8Symbol::A) == 0 {

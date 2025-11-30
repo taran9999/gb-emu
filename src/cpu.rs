@@ -513,8 +513,8 @@ impl CPU<'_> {
 
             Instruction::INC_r16(r16s) => self.inc_r16(r16s),
 
-            Instruction::INC_r8(r8s) => {
-                let r = self.get_r8(&r8s);
+            Instruction::INC_r8(op) => {
+                let (r, cycles) = self.val_from_op8(&op);
 
                 self.f.n = false;
 
@@ -524,14 +524,14 @@ impl CPU<'_> {
                 let new_val = r.wrapping_add(1);
                 self.f.z = new_val == 0;
 
-                self.set_r8(&r8s, new_val);
-                0
+                self.write_to_op8(&op, new_val);
+                cycles
             }
 
             Instruction::DEC_r16(r16s) => self.dec_r16(r16s),
 
-            Instruction::DEC_r8(r8s) => {
-                let r = self.get_r8(&r8s);
+            Instruction::DEC_r8(op) => {
+                let (r, cycles) = self.val_from_op8(&op);
 
                 self.f.n = true;
 
@@ -541,8 +541,8 @@ impl CPU<'_> {
                 let new_val = r.wrapping_sub(1);
                 self.f.z = new_val == 0;
 
-                self.set_r8(&r8s, new_val);
-                0
+                self.write_to_op8(&op, new_val);
+                cycles
             }
 
             Instruction::ADD_HL_r16(r16s) => {
@@ -1089,9 +1089,6 @@ impl CPU<'_> {
             if self.bus_read(0xFF02).0 == 0x81 {
                 dbg_msg.push(self.bus_read(0xFF01).0 as char);
                 println!("DBG: {}", dbg_msg);
-                if dbg_msg.ends_with("Passed") {
-                    break
-                }
                 self.bus_write(0xFF02, 0);
             }
         }

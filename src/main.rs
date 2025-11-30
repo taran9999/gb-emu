@@ -23,7 +23,7 @@ mod timer;
 fn main() {
     // read a directory for file selection
     // currently hardcoded to a "roms" directory where the the project is being run from
-    let roms: Vec<_> = fs::read_dir("roms")
+    let roms: Vec<_> = fs::read_dir("tests")
         .expect("Error reading roms directory")
         .filter_map(|f| f.ok())
         .filter(|f| {

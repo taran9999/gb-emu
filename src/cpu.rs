@@ -61,11 +61,12 @@ impl fmt::Display for Flags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{}{}{}{}",
+            "{}{}{}{} ({:02X})",
             if self.z { "Z" } else { "-" },
             if self.n { "N" } else { "-" },
             if self.h { "H" } else { "-" },
-            if self.c { "C" } else { "-" }
+            if self.c { "C" } else { "-" },
+            self.to_u8()
         )
     }
 }
@@ -470,6 +471,7 @@ impl CPU<'_> {
     fn execute(&mut self, inst: Instruction, logging_file: &mut fs::File) -> u8 {
         let curr_pc = self.pc;
         let mut inst_str = inst.to_string();
+        let mut write_to_log = true;
 
         let cycles = match inst {
             Instruction::NOP => 0,
@@ -756,8 +758,7 @@ impl CPU<'_> {
             }
 
             Instruction::POP_AF => {
-                let (mut f_new, mut cycles) = self.stack_pop_u8();
-                f_new = f_new & 0xF0;
+                let (f_new, mut cycles) = self.stack_pop_u8();
                 self.f.set_from_u8(f_new >> 4);
 
                 let (a_new, c) = self.stack_pop_u8();
@@ -891,6 +892,7 @@ impl CPU<'_> {
             Instruction::PREFIX => {
                 let (op, cycles) = self.fetch();
                 let inst = Instruction::decode_prefix(op);
+                write_to_log = false;
                 cycles + self.execute(inst, logging_file)
             }
 
@@ -1016,18 +1018,19 @@ impl CPU<'_> {
             Instruction::NotImplemented => 4,
         };
 
-        let a = self.a.get();
-        let f = self.f.clone();
-        let bc = self.get_r16(&Reg16Symbol::BC);
-        let de = self.get_r16(&Reg16Symbol::DE);
-        let hl = self.get_r16(&Reg16Symbol::HL);
-
-        let state = format!(
-            "CPU: {:04X}\t{:<24}M: {cycles}\tA: {:02X}\tF: {f}\tBC: {:04X}\tDE: {:04X}\tHL: {:04X}\tSP: {:04X}\n",
-            curr_pc, inst_str, a, bc, de, hl, self.sp
-        );
-        logging_file.write_all(state.as_bytes()).expect("Failed to write to insts log");
-
+        if write_to_log {
+            let a = self.a.get();
+            let f = self.f.clone();
+            let bc = self.get_r16(&Reg16Symbol::BC);
+            let de = self.get_r16(&Reg16Symbol::DE);
+            let hl = self.get_r16(&Reg16Symbol::HL);
+    
+            let state = format!(
+                "CPU: {:04X}\t{:<24}M: {cycles}\tA: {:02X}\tF: {f}\tBC: {:04X}\tDE: {:04X}\tHL: {:04X}\tSP: {:04X}\n",
+                curr_pc, inst_str, a, bc, de, hl, self.sp
+            );
+            logging_file.write_all(state.as_bytes()).expect("Failed to write to insts log");
+        }
 
         cycles
     }

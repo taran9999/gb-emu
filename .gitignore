@@ -1,3 +1,6 @@
 target/
 debug/
 roms/
+gb_logs/
+tests/
+run_gb_doctor_test.sh

@@ -977,7 +977,7 @@ impl CPU<'_> {
                 let new = val >> 1;
                 cycles += 1;
 
-                self.f.z = val == 0;
+                self.f.z = new == 0;
                 self.f.n = false;
                 self.f.h = false;
                 self.f.c = val & 1 == 1;

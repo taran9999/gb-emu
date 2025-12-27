@@ -31,29 +31,29 @@ impl Flags {
     fn to_u8(&self) -> u8 {
         let mut res: u8 = 0;
         if self.z {
-            res |= 0b1;
+            res |= 1u8 << 7;
         }
 
         if self.n {
-            res |= 0b10;
+            res |= 1u8 << 6;
         }
 
         if self.h {
-            res |= 0b100;
+            res |= 1u8 << 5;
         }
 
         if self.c {
-            res |= 0b1000;
+            res |= 1u8 << 4;
         }
 
         res
     }
 
     fn set_from_u8(&mut self, val: u8) {
-        self.z = val & 1 == 1;
-        self.n = (val >> 1) & 1 == 1;
-        self.h = (val >> 2) & 1 == 1;
-        self.c = (val >> 3) & 1 == 1;
+        self.z = (val >> 7) & 1 == 1;
+        self.n = (val >> 6) & 1 == 1;
+        self.h = (val >> 5) & 1 == 1;
+        self.c = (val >> 4) & 1 == 1;
     }
 }
 
@@ -121,7 +121,7 @@ impl CPU<'_> {
     pub fn export_state(&self) -> String {
         format!("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n",
         self.a.get(),
-        self.f.to_u8().reverse_bits(),
+        self.f.to_u8(),
         self.b.get(), self.c.get(), self.d.get(),
         self.e.get(), self.h.get(), self.l.get(),
         self.sp, self.pc,
@@ -752,14 +752,14 @@ impl CPU<'_> {
                 let c1 = self.stack_push_u8(a);
 
                 let f = self.f.to_u8();
-                let c2 = self.stack_push_u8(f << 4);
+                let c2 = self.stack_push_u8(f);
 
                 c1 + c2
             }
 
             Instruction::POP_AF => {
                 let (f_new, mut cycles) = self.stack_pop_u8();
-                self.f.set_from_u8(f_new >> 4);
+                self.f.set_from_u8(f_new);
 
                 let (a_new, c) = self.stack_pop_u8();
                 cycles += c;

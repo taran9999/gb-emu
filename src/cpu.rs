@@ -815,6 +815,8 @@ impl CPU<'_> {
 
             Instruction::DAA => {
                 let mut adj = 0;
+                let a = self.get_r8(&Reg8Symbol::A);
+                let mut new = a;
 
                 if self.f.n {
                     if self.f.h {
@@ -825,23 +827,23 @@ impl CPU<'_> {
                         adj += 0x60;
                     }
 
-                    self.set_r8(&Reg8Symbol::A, self.get_r8(&Reg8Symbol::A).wrapping_sub(adj));
+                    new = new.wrapping_sub(adj);
                 } else {
-                    if self.f.h || self.get_r8(&Reg8Symbol::A) & 0x0F > 0x09 {
+                    if self.f.h || a & 0x0F > 0x09 {
                         adj += 0x06;
                     }
 
-                    if self.f.c || self.get_r8(&Reg8Symbol::A) > 0x99 {
+                    if self.f.c || a > 0x99 {
                         adj += 0x60;
                         self.f.c = true;
                     }
 
-                    self.set_r8(&Reg8Symbol::A, self.get_r8(&Reg8Symbol::A).wrapping_add(adj));
+                    new = new.wrapping_add(adj);
                 }
 
-                let new = self.get_r8(&Reg8Symbol::A).wrapping_sub(adj);
+                self.set_r8(&Reg8Symbol::A, new);
 
-                self.f.z = self.get_r8(&Reg8Symbol::A) == 0;
+                self.f.z = new == 0;
                 self.f.h = false;
 
                 0

@@ -583,7 +583,7 @@ impl CPU<'_> {
 
                 self.sp = self.sp.wrapping_add_signed(ofs_signed.into());
 
-                self.f.z = self.sp == 0;
+                self.f.z = false;
                 self.f.n = false;
                 3
             }

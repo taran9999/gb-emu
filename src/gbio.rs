@@ -44,7 +44,7 @@ impl Io<'_> {
             0xFF0F => self.int_flag = value,
             0xFF10..=0xFF3F => self.apu.apu_write(address, value),
             0xFFFF => self.int_enable_flag = value,
-            _ => println!("(Warning) io write out of bounds at ${:04X}", address),
+            _ => println!("(Warning): io write out of bounds at ${:04X}", address),
         }
     }
 

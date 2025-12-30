@@ -465,6 +465,23 @@ impl CPU<'_> {
         }
     }
 
+    fn add_sp_e8(&mut self) -> (u16, u8) {
+        let (ofs, _) = self.fetch();
+        let ofs_signed = ofs as i8;
+
+        // set h and c flags as u8 addition
+        let sp_low = (self.sp & 0xFF) as u8;
+        self.f.h = (sp_low & 0x0F) + (ofs & 0x0F) > 0x0F;
+        self.f.c = (sp_low as u16) + (ofs as u16) > 0xFF;
+
+        let res = self.sp.wrapping_add_signed(ofs_signed.into());
+
+        self.f.z = false;
+        self.f.n = false;
+
+        (res, 3)
+    }
+
     // Instructions take a variable amount of CPU cycles
     // from https://emudev.de/gameboy-emulator/opcode-cycles-and-timings/ return the number of
     // cycles executed to develop accurate timing. Yields number of M-cycles.
@@ -508,9 +525,9 @@ impl CPU<'_> {
 
             // NOTE: should this actually add to sp or no
             Instruction::LD_HL_SP_e8 => {
-                self.execute(Instruction::ADD_SP_e8, logging_file);
-                self.set_r16(&Reg16Symbol::HL, self.sp);
-                2
+                let (res, cycles) = self.add_sp_e8();
+                self.set_r16(&Reg16Symbol::HL, res);
+                cycles + 2
             }
 
             Instruction::INC_r16(r16s) => self.inc_r16(r16s),
@@ -573,19 +590,9 @@ impl CPU<'_> {
             }
 
             Instruction::ADD_SP_e8 => {
-                let (ofs, _) = self.fetch();
-                let ofs_signed = ofs as i8;
-
-                // set h and c flags as u8 addition
-                let sp_low = (self.sp & 0xFF) as u8;
-                self.f.h = (sp_low & 0x0F) + (ofs & 0x0F) > 0x0F;
-                self.f.c = (sp_low as u16) + (ofs as u16) > 0xFF;
-
-                self.sp = self.sp.wrapping_add_signed(ofs_signed.into());
-
-                self.f.z = false;
-                self.f.n = false;
-                3
+                let (res, cycles) = self.add_sp_e8();
+                self.sp = res;
+                cycles
             }
 
             Instruction::ADC_A(op) => {

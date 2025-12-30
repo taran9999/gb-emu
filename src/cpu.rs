@@ -523,7 +523,6 @@ impl CPU<'_> {
                 4
             }
 
-            // NOTE: should this actually add to sp or no
             Instruction::LD_HL_SP_e8 => {
                 let (res, cycles) = self.add_sp_e8();
                 self.set_r16(&Reg16Symbol::HL, res);
